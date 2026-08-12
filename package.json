@@ -10,7 +10,8 @@
     "start": "electron .",
     "dist": "electron-builder",
     "dist:win": "electron-builder --win",
-    "dist:linux": "electron-builder --linux"
+    "dist:linux": "electron-builder --linux",
+    "test": "node --test \"src/main/*.test.cjs\""
   },
   "build": {
     "appId": "com.kloping.singboxbridgesub",
@@ -33,7 +34,8 @@
   },
   "dependencies": {
     "extract-zip": "^2.0.1",
-    "undici": "^6.28.0"
+    "undici": "^6.28.0",
+    "js-yaml": "^4.1.0"
   },
   "devDependencies": {
     "electron": "^37.2.6",

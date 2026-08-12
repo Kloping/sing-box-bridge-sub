@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+﻿const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
@@ -6,10 +7,14 @@ const { Readable } = require('node:stream');
 const { once } = require('node:events');
 const extract = require('extract-zip');
 const { ProxyAgent } = require('undici');
+const { createSubscriptionService, maskUrl } = require('./main/subscription-service.cjs');
+const { buildConfig, DEFAULT_LISTEN, DEFAULT_PORT } = require('./main/singbox.cjs');
 
 const repository = 'SagerNet/sing-box';
 let mainWindow;
 let downloadJob;
+let proxyJob;
+const subscriptionService = createSubscriptionService(app.getPath('userData'));
 
 function getTarget() {
   const platformName = { win32: 'windows', linux: 'linux', darwin: 'darwin' }[process.platform];
@@ -28,6 +33,90 @@ function getExecutablePath() {
 
 function getLogPath() {
   return path.join(app.getPath('userData'), 'logs', 'download.log');
+}
+
+function getRuntimeDirectory() {
+  return path.join(app.getPath('userData'), 'runtime');
+}
+
+function getRuntimeConfigPath() {
+  return path.join(getRuntimeDirectory(), 'config.json');
+}
+
+function getCoreLogPath() {
+  return path.join(app.getPath('userData'), 'logs', 'core.log');
+}
+
+function sendNodeStatus() {
+  mainWindow?.webContents.send('node:status', { runningNodes: proxyJob ? proxyJob.nodes.map(toPublicProxy) : [] });
+}
+
+function toPublicProxy(job) {
+  return { nodeId: job.id, mode: job.mode || 'mixed', listen: job.listen || DEFAULT_LISTEN, port: job.proxyPort };
+}
+
+function validateProxyPort(port) {
+  const value = Number(port);
+  if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error('代理端口必须是 1 到 65535 之间的整数');
+  return value;
+}
+
+async function stopProxy() {
+  const job = proxyJob;
+  if (!job) return false;
+  proxyJob = null;
+  if (!job.process || job.process.exitCode !== null) return true;
+  job.process.kill();
+  await Promise.race([once(job.process, 'close'), new Promise((resolve) => setTimeout(resolve, 2000))]);
+  sendNodeStatus();
+  return true;
+}
+
+async function restartProxy(nodes) {
+  if (!nodes.length) {
+    await stopProxy();
+    return;
+  }
+  const config = await buildConfig(nodes, path.join(__dirname, 'test', 'config.json'), { listen: DEFAULT_LISTEN, mode: 'mixed' });
+  await fsp.mkdir(getRuntimeDirectory(), { recursive: true });
+  const configPath = getRuntimeConfigPath();
+  const tempConfig = `${configPath}.tmp`;
+  await fsp.writeFile(tempConfig, JSON.stringify(config, null, 2) + '\n', 'utf8');
+  await fsp.rename(tempConfig, configPath);
+  const check = spawnSync(getExecutablePath(), ['check', '-c', configPath], { encoding: 'utf8' });
+  if (check.error) throw new Error(`启动 sing-box 失败：${check.error.message}`);
+  if (check.status !== 0) throw new Error(`sing-box 配置校验失败：${(check.stderr || check.stdout || '').trim()}`);
+
+  await stopProxy();
+  const child = spawn(getExecutablePath(), ['run', '-c', configPath], { windowsHide: true });
+  await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
+  await fsp.mkdir(path.dirname(getCoreLogPath()), { recursive: true });
+  const logStream = fs.createWriteStream(getCoreLogPath(), { flags: 'a' });
+  child.stdout?.pipe(logStream, { end: false });
+  child.stderr?.pipe(logStream, { end: false });
+  const job = { process: child, nodes, configPath };
+  proxyJob = job;
+  child.once('close', () => {
+    logStream.end();
+    if (proxyJob?.process === child) { proxyJob = null; sendNodeStatus(); }
+  });
+  sendNodeStatus();
+}
+
+async function startProxy(nodeId, options = {}) {
+  const node = await subscriptionService.getNode(nodeId);
+  if (!node) throw new Error('节点不存在');
+  if (!node.supported) throw new Error(node.error || '节点不支持');
+  const listen = DEFAULT_LISTEN;
+  const port = validateProxyPort(options.port ?? DEFAULT_PORT);
+  const mode = String(options.mode || 'mixed');
+  if (mode !== 'mixed') throw new Error('当前仅支持 mixed 代理模式');
+  const nodes = proxyJob?.nodes.filter((item) => item.id !== nodeId) || [];
+  if (nodes.some((item) => item.proxyPort === port)) throw new Error(`端口 ${port} 已被其他节点占用`);
+  nodes.push({ ...node, proxyPort: port, listen, mode });
+  await restartProxy(nodes);
+  await subscriptionService.selectNode(nodeId);
+  return toPublicProxy(nodes.find((item) => item.id === nodeId));
 }
 
 function maskProxy(proxyUrl) {
@@ -253,6 +342,7 @@ ipcMain.handle('core:status', async () => ({
   target: getTarget(),
   path: getExecutablePath(),
   logPath: getLogPath(),
+  proxy: proxyJob ? { nodes: proxyJob.nodes.map(toPublicProxy), configPath: getRuntimeConfigPath() } : null,
   download: downloadJob ? { status: downloadJob.status, received: downloadJob.received, total: downloadJob.total } : null
 }));
 ipcMain.handle('core:open-log', () => shell.openPath(getLogPath()));
@@ -285,6 +375,60 @@ ipcMain.handle('core:download-cancel', async () => {
   return true;
 });
 
+
+function toPublicSubscription(subscription) {
+  return { ...subscription, url: maskUrl(subscription.url) };
+}
+
+function toPublicNode(node) {
+  const { raw, ...publicNode } = node;
+  return publicNode;
+}
+
+ipcMain.handle('subscription:list', async () => {
+  const subscriptions = await subscriptionService.listSubscriptions();
+  return subscriptions.map(toPublicSubscription);
+});
+ipcMain.handle('subscription:add', async (_event, payload) => {
+  const subscription = await subscriptionService.addSubscription(payload || {});
+  return toPublicSubscription(subscription);
+});
+ipcMain.handle('subscription:update', async (_event, { id, name }) => {
+  const subscription = await subscriptionService.updateSubscription(id, { name });
+  return toPublicSubscription(subscription);
+});
+ipcMain.handle('subscription:remove', async (_event, id) => {
+  if (typeof id !== 'string' || !id) throw new Error('无效的订阅 ID');
+  await subscriptionService.removeSubscription(id);
+  return { removed: true };
+});
+ipcMain.handle('subscription:refresh', async (_event, id) => {
+  if (typeof id !== 'string' || !id) throw new Error('无效的订阅 ID');
+  const subscription = await subscriptionService.refreshSubscription(id);
+  return toPublicSubscription(subscription);
+});
+ipcMain.handle('subscription:refresh-all', async () => {
+  const results = await subscriptionService.refreshAll();
+  return results.map((result) => result.ok
+    ? { id: result.id, ok: true, subscription: toPublicSubscription(result.data) }
+    : { id: result.id, ok: false, error: result.error });
+});
+ipcMain.handle('node:list', async (_event, filters) => {
+  const { selectedNodeId, nodes } = await subscriptionService.listNodes(filters || {});
+  const running = new Map((proxyJob?.nodes || []).map((node) => [node.id, toPublicProxy(node)]));
+  return { selectedNodeId, runningNodes: [...running.values()], nodes: nodes.map(toPublicNode) };
+});
+ipcMain.handle('node:start', async (_event, { id, port, mode } = {}) => {
+  if (typeof id !== 'string' || !id) throw new Error('无效的节点 ID');
+  return startProxy(id, { port, mode });
+});
+ipcMain.handle('node:stop', async (_event, id) => {
+  if (typeof id !== 'string' || !id) throw new Error('无效的节点 ID');
+  const nodes = proxyJob?.nodes.filter((node) => node.id !== id) || [];
+  await restartProxy(nodes);
+  return { runningNodes: nodes.map(toPublicProxy) };
+});
+
 app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => {
@@ -294,4 +438,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('will-quit', () => {
+  proxyJob?.process?.kill();
 });

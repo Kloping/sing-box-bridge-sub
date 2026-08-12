@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -75,6 +75,47 @@
 
         <section id="subscriptionList" class="subscription-list" aria-live="polite"></section>
       </section>
+
+      <section class="content" id="nodes" hidden>
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">NODES</p>
+            <h1>节点列表</h1>
+            <p class="muted">点击节点即可设置并启动本地代理；开启或关闭节点后会重启合并配置。</p>
+          </div>
+          <div class="header-status"><i></i><span id="nodeCountLabel">0 个节点</span></div>
+        </header>
+
+        <section class="card filter-card">
+          <label>
+            <span>订阅</span>
+            <select id="nodeSubscriptionFilter"></select>
+          </label>
+          <label>
+            <span>协议</span>
+            <select id="nodeTypeFilter">
+              <option value="all">全部协议</option>
+              <option value="ss">SS</option>
+              <option value="vmess">VMess</option>
+              <option value="vless">VLESS</option>
+              <option value="trojan">Trojan</option>
+              <option value="socks5">SOCKS5</option>
+              <option value="http">HTTP</option>
+              <option value="hysteria2">Hysteria2</option>
+            </select>
+          </label>
+          <label>
+            <span>运行状态</span>
+            <select id="nodeStatusFilter">
+              <option value="all">全部节点</option>
+              <option value="running">已开启</option>
+              <option value="stopped">未开启</option>
+            </select>
+          </label>
+        </section>
+
+        <section id="nodeList" class="node-list" aria-live="polite"></section>
+      </section>
     </main>
 
     <div id="coreModal" class="modal-backdrop" hidden>
@@ -114,6 +155,44 @@
         </form>
       </section>
     </div>
+
+    <div id="nodeModal" class="modal-backdrop" hidden>
+      <section class="modal card" role="dialog" aria-modal="true" aria-labelledby="nodeModalTitle">
+        <button id="closeNodeModal" class="modal-close" type="button" aria-label="关闭">×</button>
+        <div class="modal-heading">
+          <div class="section-icon">↗</div>
+          <div>
+            <p class="eyebrow">NODE PROXY</p>
+            <h2 id="nodeModalTitle">启动节点代理</h2>
+          </div>
+        </div>
+        <form id="nodeSettingsForm">
+          <p id="nodeModalDescription" class="modal-description"></p>
+          <div class="settings-fields">
+            <label>
+              <span>代理模式</span>
+              <select id="nodeModeInput" name="mode" disabled>
+                <option value="mixed">mixed</option>
+              </select>
+            </label>
+            <label>
+              <span>监听地址</span>
+              <input id="nodeListenInput" value="127.0.0.1" readonly />
+            </label>
+            <label>
+              <span>代理端口</span>
+              <input id="nodePortInput" name="port" type="number" min="1" max="65535" step="1" value="2080" required />
+            </label>
+          </div>
+          <p id="nodeMessage" class="form-message" role="status"></p>
+          <div class="modal-actions">
+            <button id="cancelNodeModal" class="secondary" type="button">取消</button>
+            <button class="primary" type="submit">启动代理</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
     <script src="./renderer.js"></script>
   </body>
 </html>

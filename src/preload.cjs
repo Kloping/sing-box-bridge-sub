@@ -1,5 +1,25 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+contextBridge.exposeInMainWorld('subApi', {
+  list: () => ipcRenderer.invoke('subscription:list'),
+  add: (payload) => ipcRenderer.invoke('subscription:add', payload),
+  update: (id, name) => ipcRenderer.invoke('subscription:update', { id, name }),
+  remove: (id) => ipcRenderer.invoke('subscription:remove', id),
+  refresh: (id) => ipcRenderer.invoke('subscription:refresh', id),
+  refreshAll: () => ipcRenderer.invoke('subscription:refresh-all')
+});
+
+contextBridge.exposeInMainWorld('nodeApi', {
+  list: (filters) => ipcRenderer.invoke('node:list', filters),
+  start: (payload) => ipcRenderer.invoke('node:start', payload),
+  stop: (id) => ipcRenderer.invoke('node:stop', id),
+  onStatus: (callback) => {
+    const listener = (_event, status) => callback(status);
+    ipcRenderer.on('node:status', listener);
+    return () => ipcRenderer.removeListener('node:status', listener);
+  }
+});
+
 contextBridge.exposeInMainWorld('coreApi', {
   getStatus: () => ipcRenderer.invoke('core:status'),
   openLog: () => ipcRenderer.invoke('core:open-log'),

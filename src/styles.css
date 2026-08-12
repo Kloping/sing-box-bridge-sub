@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   color: #182230;
   background: #f7f9fc;
   font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
@@ -11,7 +11,7 @@ button, input { font: inherit; }
 button { border: 0; cursor: pointer; }
 
 .app-shell { display: flex; min-height: 100vh; }
-.sidebar { display: flex; width: 238px; flex-direction: column; padding: 28px 18px; color: #dce7f6; background: #17253a; }
+.sidebar { position: sticky; top: 0; align-self: flex-start; display: flex; width: 238px; height: 100vh; flex-direction: column; padding: 28px 18px; color: #dce7f6; background: #17253a; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 0 10px; }
 .brand-mark { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: #fff; background: #3478f6; font-size: 19px; font-weight: 700; }
 .brand-mark img { display: block; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
@@ -99,6 +99,29 @@ input:focus { border-color: #6c9cf8; box-shadow: 0 0 0 3px #3478f614; }
 .empty-icon { display: grid; width: 48px; height: 48px; place-items: center; margin-bottom: 15px; border-radius: 13px; color: #3478f6; background: #edf4ff; font-size: 24px; }
 .empty-state h3 { color: #34445b; font-size: 16px; }
 
+
+select { width: 100%; padding: 10px 12px; border: 1px solid #dce3ed; border-radius: 8px; outline: none; color: #25344b; background: #fbfcfe; font-size: 13px; }
+.filter-card { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; padding: 18px 22px; margin-bottom: 18px; }
+.node-list { display: grid; gap: 9px; }
+.node-item { display: flex; align-items: center; gap: 14px; padding: 14px 18px; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease; }
+.node-item:hover { border-color: #9dbaf0; }
+.node-item.running { border-color: #3478f6; box-shadow: 0 0 0 3px #3478f614; }
+.node-item.unsupported-item { cursor: default; }
+.node-badge { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 9px; color: #3478f6; background: #edf4ff; font-size: 11px; font-weight: 700; }
+.node-main { min-width: 0; flex: 1; }
+.node-main h3 { overflow: hidden; color: #26364d; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.node-main p { overflow: hidden; margin: 4px 0 0; color: #8491a3; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.node-proxy-meta { display: block; margin-top: 5px; color: #26815a; font-size: 11px; }
+.selected-tag { color: #3478f6; font-size: 10px; font-weight: 600; }
+.unsupported, .subscription-error { color: #cb4c54; }
+.subscription-error { margin: 6px 0 0; font-size: 11px; }
+.status-ok { background: #2fbf71 !important; }
+.status-error { background: #d9534f !important; }
+.status-updating { background: #3478f6 !important; }
+.node-action { flex: 0 0 auto; color: #3478f6; font-size: 11px; font-weight: 600; }
+.running .node-action { color: #bd6a70; }
+.unsupported-item .node-action { color: #cb4c54; }
+
 @media (max-width: 760px) {
   .sidebar { width: 190px; }
   .content { padding: 32px 24px; }
@@ -108,7 +131,7 @@ input:focus { border-color: #6c9cf8; box-shadow: 0 0 0 3px #3478f614; }
 
 @media (max-width: 560px) {
   .app-shell { display: block; }
-  .sidebar { width: 100%; padding: 18px; }
+  .sidebar { position: static; width: 100%; height: auto; padding: 18px; }
   .nav { display: flex; margin-top: 20px; }
   .nav-item { flex: 1; justify-content: center; padding: 9px 5px; }
   .nav-item span { display: none; }
@@ -118,4 +141,5 @@ input:focus { border-color: #6c9cf8; box-shadow: 0 0 0 3px #3478f614; }
   .subscription-item { align-items: flex-start; flex-wrap: wrap; }
   .subscription-actions { width: 100%; margin-left: 53px; }
   .settings-fields { grid-template-columns: 1fr; }
+  .filter-card { grid-template-columns: 1fr; }
 }
