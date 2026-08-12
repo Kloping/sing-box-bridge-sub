@@ -202,6 +202,39 @@ function createProxyAgent(proxyUrl) {
   return new ProxyAgent(url.toString());
 }
 
+async function testProxyNode(nodeId) {
+  if (typeof nodeId !== 'string' || !nodeId) throw new Error('无效的节点 ID');
+  const node = proxyJob?.nodes.find((item) => item.id === nodeId);
+  if (!node) throw new Error('该节点代理尚未开启');
+  const agent = createProxyAgent(`http://${node.listen}:${validateProxyPort(node.proxyPort)}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  const startedAt = process.hrtime.bigint();
+  try {
+    const response = await fetch('https://uapis.cn/api/v1/network/myip', fetchOptions(agent, {
+      headers: { accept: 'application/json' },
+      signal: controller.signal
+    }));
+    const latency = Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6);
+    if (!response.ok) throw new Error(`测试接口返回 HTTP ${response.status}`);
+    let data;
+    try { data = JSON.parse(await response.text()); } catch { throw new Error('测试接口返回了无效数据'); }
+    return {
+      latency,
+      ip: String(data.ip || ''),
+      region: String(data.region || ''),
+      isp: String(data.isp || ''),
+      asn: String(data.asn || '')
+    };
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('测试超时（10 秒）');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    await agent.close();
+  }
+}
+
 function sendCoreEvent(event) {
   mainWindow?.webContents.send('core:download-event', event);
 }
@@ -448,6 +481,7 @@ ipcMain.handle('node:start', async (_event, payload = {}) => {
 ipcMain.handle('node:stop', async (_event, id) => {
   return stopProxyNodes(Array.isArray(id) ? id : [id]);
 });
+ipcMain.handle('node:test-ip', async (_event, nodeId) => testProxyNode(nodeId));
 
 app.whenReady().then(() => {
   createWindow();

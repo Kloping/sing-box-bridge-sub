@@ -125,7 +125,11 @@
 
         <div class="node-bulk-actions">
           <span id="nodeSelectionLabel" class="muted">已勾选 0 个节点</span>
-          <div>
+          <div class="node-toolbar-actions">
+            <div class="view-switch" role="group" aria-label="节点列表布局">
+              <button id="nodeListViewButton" class="secondary active" type="button" data-view="list" aria-pressed="true">列表</button>
+              <button id="nodeTableViewButton" class="secondary" type="button" data-view="table" aria-pressed="false">表格</button>
+            </div>
             <button id="startSelectedNodesButton" class="primary" type="button" disabled>批量开启</button>
             <button id="stopSelectedNodesButton" class="danger" type="button" disabled>批量关闭</button>
           </div>

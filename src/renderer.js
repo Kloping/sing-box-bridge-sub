@@ -39,6 +39,8 @@ const batchNodeModal = document.querySelector('#batchNodeModal');
 const batchNodeSettingsForm = document.querySelector('#batchNodeSettingsForm');
 const batchNodeSettingsList = document.querySelector('#batchNodeSettingsList');
 const batchNodeMessage = document.querySelector('#batchNodeMessage');
+const nodeListViewButton = document.querySelector('#nodeListViewButton');
+const nodeTableViewButton = document.querySelector('#nodeTableViewButton');
 
 let subscriptions = [];
 let nodeView = { runningNodeId: null, nodes: [] };
@@ -48,6 +50,9 @@ let nodeFilterStatus = 'all';
 let pendingNodeId = null;
 let selectedNodeIds = new Set();
 let downloadActive = false;
+let nodeLayout = localStorage.getItem('nodeLayout') === 'table' ? 'table' : 'list';
+const nodeTestResults = new Map();
+const nodeTestPending = new Set();
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({
@@ -279,6 +284,11 @@ function renderNodeFilters() {
 const TYPE_BADGES = { ss: 'SS', vmess: 'VM', vless: 'VL', trojan: 'TR', socks5: 'S5', http: 'HTTP', hysteria2: 'HY' };
 
 function renderNodeList() {
+  nodeList.classList.toggle('table-view', nodeLayout === 'table');
+  nodeListViewButton.classList.toggle('active', nodeLayout === 'list');
+  nodeTableViewButton.classList.toggle('active', nodeLayout === 'table');
+  nodeListViewButton.setAttribute('aria-pressed', String(nodeLayout === 'list'));
+  nodeTableViewButton.setAttribute('aria-pressed', String(nodeLayout === 'table'));
   if (!subscriptions.length) {
     nodeList.innerHTML = `<div class="card empty-state"><div class="empty-icon">⌁</div><h3>还没有订阅</h3><p class="muted">先在上方添加订阅并刷新。</p></div>`;
     nodeCountLabel.textContent = '0 个节点';
@@ -296,19 +306,49 @@ function renderNodeList() {
     const proxy = runningById.get(node.id);
     const running = Boolean(proxy);
     const unsupported = !node.supported;
+    const tableRow = nodeLayout === 'table';
+    const test = nodeTestResults.get(node.id);
+    const testOutput = test
+      ? `<span class="node-test-result ${test.error ? 'error' : ''}">${test.error ? escapeHtml(test.error) : `IP ${escapeHtml(test.ip)} · ${escapeHtml(test.region)} · ${test.latency} ms`}</span>`
+      : '';
     return `
-      <article class="card node-item ${running ? 'running' : ''} ${unsupported ? 'unsupported-item' : ''}" data-id="${node.id}" role="button" tabindex="${unsupported ? '-1' : '0'}" aria-disabled="${unsupported}">
+      <article class="card node-item ${tableRow ? 'table-row' : ''} ${running ? 'running' : ''} ${unsupported ? 'unsupported-item' : ''}" data-id="${node.id}" role="button" tabindex="${unsupported ? '-1' : '0'}" aria-disabled="${unsupported}">
         <input class="node-check" type="checkbox" data-node-id="${node.id}" ${selectedNodeIds.has(node.id) ? 'checked' : ''} ${unsupported ? 'disabled' : ''} aria-label="勾选 ${escapeHtml(node.name)}" />
         <div class="node-badge">${escapeHtml(badge)}</div>
         <div class="node-main">
-          <h3>${renderName(node.name)}${running ? ' <span class="selected-tag">代理运行中</span>' : ''}</h3>
+          <h3>${renderName(node.name)}${running && !tableRow ? ' <span class="selected-tag">代理运行中</span>' : ''}</h3>
           <p>${escapeHtml(node.type)} · ${escapeHtml(node.server)}:${escapeHtml(node.port)}${unsupported ? ` · <span class="unsupported">${escapeHtml(node.error)}</span>` : ''}</p>
-          ${proxy ? `<span class="node-proxy-meta">代理：${escapeHtml(proxy.mode)} · ${escapeHtml(proxy.listen)}:${escapeHtml(proxy.port)}</span>` : ''}
+          ${proxy && !tableRow ? `<span class="node-proxy-meta">代理：${escapeHtml(proxy.mode)} · ${escapeHtml(proxy.listen)}:${escapeHtml(proxy.port)}</span>${testOutput}` : ''}
         </div>
+        ${tableRow ? `<div class="node-table-proxy">${proxy ? `<span class="proxy-status running-status">运行中</span><span>${escapeHtml(proxy.listen)}:${escapeHtml(proxy.port)}</span>${testOutput}` : '<span class="proxy-status">未启动</span>'}</div>` : ''}
+        ${proxy ? `<button class="node-test" type="button" data-node-id="${node.id}" ${nodeTestPending.has(node.id) ? 'disabled' : ''}>${nodeTestPending.has(node.id) ? '测试中...' : '测试 IP / 延迟'}</button>` : ''}
         <span class="node-action">${unsupported ? '不支持' : running ? '停止代理' : '启动代理'}</span>
       </article>`;
   }).join('');
   updateNodeSelectionActions();
+}
+
+function setNodeLayout(layout) {
+  nodeLayout = layout === 'table' ? 'table' : 'list';
+  localStorage.setItem('nodeLayout', nodeLayout);
+  renderNodeList();
+}
+
+nodeListViewButton.addEventListener('click', () => setNodeLayout('list'));
+nodeTableViewButton.addEventListener('click', () => setNodeLayout('table'));
+
+async function testNodeIp(nodeId) {
+  nodeTestPending.add(nodeId);
+  nodeTestResults.delete(nodeId);
+  renderNodeList();
+  try {
+    nodeTestResults.set(nodeId, await window.nodeApi.testIp(nodeId));
+  } catch (error) {
+    nodeTestResults.set(nodeId, { error: error.message });
+  } finally {
+    nodeTestPending.delete(nodeId);
+    renderNodeList();
+  }
 }
 
 function updateNodeSelectionActions() {
@@ -373,6 +413,12 @@ function openBatchNodeModal() {
 
 nodeList.addEventListener('click', async (event) => {
   if (event.target.closest('.node-check')) return;
+  const testButton = event.target.closest('.node-test');
+  if (testButton) {
+    event.stopPropagation();
+    await testNodeIp(testButton.dataset.nodeId);
+    return;
+  }
   const item = event.target.closest('.node-item');
   if (!item || item.classList.contains('unsupported-item')) return;
   try {

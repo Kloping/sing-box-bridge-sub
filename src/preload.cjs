@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('nodeApi', {
   list: (filters) => ipcRenderer.invoke('node:list', filters),
   start: (payload) => ipcRenderer.invoke('node:start', payload),
   stop: (id) => ipcRenderer.invoke('node:stop', id),
+  testIp: (id) => ipcRenderer.invoke('node:test-ip', id),
   onStatus: (callback) => {
     const listener = (_event, status) => callback(status);
     ipcRenderer.on('node:status', listener);
