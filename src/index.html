@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sing-box Bridge Sub</title>
     <link rel="icon" type="image/png" href="./logo.png" />
+    <script>
+      document.documentElement.dataset.theme = localStorage.getItem('theme') || 'system';
+    </script>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -19,10 +22,19 @@
         </div>
 
         <nav class="nav" aria-label="主导航">
-          <a class="nav-item" href="#subscriptions"><span>▤</span>订阅管理</a>
-          <a class="nav-item" href="#nodes"><span>⌁</span>节点列表</a>
-          <a class="nav-item active" href="#settings"><span>⚙</span>运行设置</a>
+          <a class="nav-item" href="#subscriptions"><span class="nav-glyph" aria-hidden="true">01</span>订阅管理</a>
+          <a class="nav-item" href="#nodes"><span class="nav-glyph" aria-hidden="true">02</span>节点列表</a>
+          <a class="nav-item active" href="#settings"><span class="nav-glyph" aria-hidden="true">03</span>运行设置</a>
         </nav>
+
+        <div class="theme-control">
+          <div class="theme-control-heading"><span class="theme-glyph" aria-hidden="true">◐</span><span>界面主题</span></div>
+          <select id="themeSelect" aria-label="选择界面主题">
+            <option value="system">跟随系统</option>
+            <option value="light">亮色模式</option>
+            <option value="dark">暗色模式</option>
+          </select>
+        </div>
 
         <div class="core-card">
           <div class="core-heading"><span class="pulse"></span><span>sing-box 核心</span></div>
@@ -53,7 +65,7 @@
 
         <section class="card import-card">
           <div class="section-title">
-            <div class="section-icon">＋</div>
+            <div class="section-icon" aria-hidden="true">+</div>
             <div>
               <h2>导入订阅链接</h2>
               <p class="muted">支持 Clash YAML/JSON 订阅链接。</p>
@@ -79,7 +91,7 @@
             <h2>我的订阅</h2>
             <p class="muted">共 <strong id="subscriptionCount">0</strong> 条订阅</p>
           </div>
-          <button id="refreshAllButton" class="secondary" type="button">↻ 刷新全部</button>
+          <button id="refreshAllButton" class="secondary" type="button"><span class="button-glyph" aria-hidden="true">↻</span>刷新全部</button>
         </section>
 
         <section id="subscriptionList" class="subscription-list" aria-live="polite"></section>
@@ -166,7 +178,7 @@
 
         <section class="card project-info-card">
           <div class="section-title">
-            <div class="section-icon">ⓘ</div>
+            <div class="section-icon" aria-hidden="true">i</div>
             <div>
               <h2>关于本项目</h2>
               <p class="muted">Sing-box Bridge Sub</p>
@@ -181,7 +193,7 @@
 
         <section class="card settings-card">
           <div class="section-title">
-            <div class="section-icon">⚙</div>
+            <div class="section-icon" aria-hidden="true">03</div>
             <div><h2>代理与核心</h2><p class="muted">端口只影响新启动的节点，已开启节点保持当前端口。</p></div>
           </div>
           <div class="runtime-details">
@@ -207,9 +219,9 @@
 
     <div id="coreModal" class="modal-backdrop" hidden>
       <section class="modal card" role="dialog" aria-modal="true" aria-labelledby="coreModalTitle">
-        <button id="closeCoreModal" class="modal-close" type="button" aria-label="关闭">×</button>
+        <button id="closeCoreModal" class="modal-close" type="button" aria-label="关闭">&#215;</button>
         <div class="modal-heading">
-          <div class="section-icon">⬇</div>
+          <div class="section-icon" aria-hidden="true">↓</div>
           <div>
             <p class="eyebrow">SING-BOX CORE</p>
             <h2 id="coreModalTitle">下载核心</h2>
@@ -245,9 +257,9 @@
 
     <div id="nodeModal" class="modal-backdrop" hidden>
       <section class="modal card" role="dialog" aria-modal="true" aria-labelledby="nodeModalTitle">
-        <button id="closeNodeModal" class="modal-close" type="button" aria-label="关闭">×</button>
+        <button id="closeNodeModal" class="modal-close" type="button" aria-label="关闭">&#215;</button>
         <div class="modal-heading">
-          <div class="section-icon">↗</div>
+          <div class="section-icon" aria-hidden="true">↗</div>
           <div>
             <p class="eyebrow">NODE PROXY</p>
             <h2 id="nodeModalTitle">启动节点代理</h2>
@@ -282,7 +294,7 @@
 
     <div id="batchNodeModal" class="modal-backdrop" hidden>
       <section class="modal card" role="dialog" aria-modal="true" aria-labelledby="batchNodeModalTitle">
-        <button id="closeBatchNodeModal" class="modal-close" type="button" aria-label="关闭">×</button>
+        <button id="closeBatchNodeModal" class="modal-close" type="button" aria-label="关闭">&#215;</button>
         <div class="modal-heading">
           <div class="section-icon">↗</div>
           <div>

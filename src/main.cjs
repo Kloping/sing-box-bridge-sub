@@ -231,33 +231,49 @@ async function testProxyNode(nodeId) {
   if (typeof nodeId !== 'string' || !nodeId) throw new Error('无效的节点 ID');
   const node = proxyJob?.nodes.find((item) => item.id === nodeId);
   if (!node) throw new Error('该节点代理尚未开启');
-  const agent = createProxyAgent(`http://${node.listen}:${validateProxyPort(node.proxyPort)}`);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-  const startedAt = process.hrtime.bigint();
-  try {
-    const response = await fetch('https://uapis.cn/api/v1/network/myip', fetchOptions(agent, {
-      headers: { accept: 'application/json' },
-      signal: controller.signal
-    }));
-    const latency = Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6);
-    if (!response.ok) throw new Error(`测试接口返回 HTTP ${response.status}`);
-    let data;
-    try { data = JSON.parse(await response.text()); } catch { throw new Error('测试接口返回了无效数据'); }
-    return {
-      latency,
-      ip: String(data.ip || ''),
-      region: String(data.region || ''),
-      isp: String(data.isp || ''),
-      asn: String(data.asn || '')
-    };
-  } catch (error) {
-    if (error.name === 'AbortError') throw new Error('测试超时（10 秒）');
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-    await agent.close();
+  const proxyUrl = `http://${node.listen}:${validateProxyPort(node.proxyPort)}`;
+  const maxAttempts = 3;
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const agent = createProxyAgent(proxyUrl);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const startedAt = process.hrtime.bigint();
+    try {
+      const response = await fetch('https://api.ip.sb/geoip/', fetchOptions(agent, {
+        headers: { accept: 'application/json', 'cache-control': 'no-cache' },
+        signal: controller.signal
+      }));
+      const latency = Math.round(Number(process.hrtime.bigint() - startedAt) / 1e6);
+      if (!response.ok) throw new Error(`测试接口返回 HTTP ${response.status}`);
+      let data;
+      try { data = JSON.parse(await response.text()); } catch { throw new Error('测试接口返回了无效数据'); }
+      return {
+        latency,
+        ip: String(data.ip || ''),
+        region: String(data.region || ''),
+        isp: String(data.isp || ''),
+        asn: String(data.asn || '')
+      };
+    } catch (error) {
+      lastError = error;
+      const code = error.code || error.cause?.code;
+      const retryable = error.name === 'AbortError'
+        || ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE'].includes(code)
+        || error.message === 'fetch failed';
+      if (!retryable || attempt === maxAttempts) break;
+      await new Promise((resolve) => setTimeout(resolve, attempt * 300));
+    } finally {
+      clearTimeout(timeout);
+      await agent.close();
+    }
   }
+  const code = lastError?.code || lastError?.cause?.code;
+  if (lastError?.name === 'AbortError') throw new Error('测试超时，已自动重试 3 次');
+  if (['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EPIPE'].includes(code) || lastError?.message === 'fetch failed') {
+    throw new Error(`节点连接失败，已自动重试 3 次：${code || lastError.message}`);
+  }
+  throw lastError;
 }
 
 function sendCoreEvent(event) {

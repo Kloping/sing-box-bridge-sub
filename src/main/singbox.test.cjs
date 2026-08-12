@@ -16,10 +16,20 @@ test('builds a mixed unauthenticated local proxy from the default template', asy
   assert.equal(config.outbounds[0].type, 'shadowsocks');
   assert.equal(config.outbounds[0].password, 'secret');
   assert.equal(config.outbounds[1].server, 'example.org');
+  assert.deepEqual(config.dns, {
+    servers: [
+      { type: 'udp', tag: 'ali', server: '223.5.5.5' },
+      { type: 'udp', tag: 'tencent', server: '119.29.29.29' },
+      { type: 'udp', tag: 'baidu', server: '180.76.76.76' },
+      { type: 'udp', tag: 'cloudflare', server: '1.1.1.1' }
+    ],
+    final: 'ali'
+  });
   assert.deepEqual(config.route.rules.slice(1), [
     { inbound: 'mixed-in-1', action: 'route', outbound: 'selected-node-1' },
     { inbound: 'mixed-in-2', action: 'route', outbound: 'selected-node-2' }
   ]);
+  assert.equal(config.route.default_domain_resolver, 'ali');
   assert.equal(config.route.final, 'direct');
 });
 

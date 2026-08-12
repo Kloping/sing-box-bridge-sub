@@ -75,6 +75,7 @@ async function buildConfig(input, templatePath, { listen = DEFAULT_LISTEN, port 
           outbound: outbounds[index].tag
         }))
       ],
+      default_domain_resolver: 'ali',
       final: 'direct'
     }
   });

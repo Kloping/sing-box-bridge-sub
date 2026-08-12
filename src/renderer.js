@@ -57,6 +57,7 @@ const settingsCleanupCore = document.querySelector('#settingsCleanupCore');
 const settingsOpenDownloadLog = document.querySelector('#settingsOpenDownloadLog');
 const settingsOpenCoreLog = document.querySelector('#settingsOpenCoreLog');
 const settingsSaveConfig = document.querySelector('#settingsSaveConfig');
+const themeSelect = document.querySelector('#themeSelect');
 
 let subscriptions = [];
 let nodeView = { runningNodeId: null, nodes: [] };
@@ -70,6 +71,19 @@ let defaultPort = 12080;
 let nodeLayout = localStorage.getItem('nodeLayout') === 'table' ? 'table' : 'list';
 const nodeTestResults = new Map();
 const nodeTestPending = new Set();
+
+function setTheme(theme) {
+  const value = ['system', 'light', 'dark'].includes(theme) ? theme : 'system';
+  document.documentElement.dataset.theme = value;
+  localStorage.setItem('theme', value);
+  if (themeSelect) themeSelect.value = value;
+}
+
+setTheme(localStorage.getItem('theme') || 'system');
+themeSelect?.addEventListener('change', () => setTheme(themeSelect.value));
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+  if ((localStorage.getItem('theme') || 'system') === 'system') setTheme('system');
+});
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({
@@ -165,7 +179,7 @@ function render() {
   list.innerHTML = subscriptions.length
     ? subscriptions.map(subscriptionCard).join('')
     : `<div class="card empty-state">
-         <div class="empty-icon">⌁</div>
+         <div class="empty-icon" aria-hidden="true">--</div>
          <h3>还没有订阅</h3>
          <p class="muted">添加订阅链接后，节点会在这里展示。</p>
        </div>`;
@@ -312,7 +326,7 @@ function renderNodeList() {
   nodeListViewButton.setAttribute('aria-pressed', String(nodeLayout === 'list'));
   nodeTableViewButton.setAttribute('aria-pressed', String(nodeLayout === 'table'));
   if (!subscriptions.length) {
-    nodeList.innerHTML = `<div class="card empty-state"><div class="empty-icon">⌁</div><h3>还没有订阅</h3><p class="muted">先在上方添加订阅并刷新。</p></div>`;
+    nodeList.innerHTML = `<div class="card empty-state"><div class="empty-icon" aria-hidden="true">--</div><h3>还没有订阅</h3><p class="muted">先在上方添加订阅并刷新。</p></div>`;
     nodeCountLabel.textContent = '0 个节点';
     return;
   }
@@ -320,7 +334,7 @@ function renderNodeList() {
   const nodes = nodeView.nodes;
   nodeCountLabel.textContent = `${nodes.length} 个节点`;
   if (!nodes.length) {
-    nodeList.innerHTML = `<div class="card empty-state"><div class="empty-icon">⌁</div><h3>没有节点</h3><p class="muted">点击订阅管理中的“刷新”拉取节点。</p></div>`;
+    nodeList.innerHTML = `<div class="card empty-state"><div class="empty-icon" aria-hidden="true">--</div><h3>没有节点</h3><p class="muted">点击订阅管理中的“刷新”拉取节点。</p></div>`;
     return;
   }
   nodeList.innerHTML = nodes.map((node) => {
@@ -334,7 +348,7 @@ function renderNodeList() {
       ? `<span class="node-test-result ${test.error ? 'error' : ''}">${test.error ? escapeHtml(test.error) : `IP ${escapeHtml(test.ip)} · ${escapeHtml(test.region)} · ${test.latency} ms`}</span>`
       : '';
     return `
-      <article class="card node-item ${tableRow ? 'table-row' : ''} ${running ? 'running' : ''} ${unsupported ? 'unsupported-item' : ''}" data-id="${node.id}" role="button" tabindex="${unsupported ? '-1' : '0'}" aria-disabled="${unsupported}">
+      <article class="card node-item ${tableRow ? 'table-row' : ''} ${running ? 'running' : ''} ${selectedNodeIds.has(node.id) ? 'selected' : ''} ${unsupported ? 'unsupported-item' : ''}" data-id="${node.id}" role="button" tabindex="${unsupported ? '-1' : '0'}" aria-selected="${selectedNodeIds.has(node.id)}" aria-disabled="${unsupported}">
         <input class="node-check" type="checkbox" data-node-id="${node.id}" ${selectedNodeIds.has(node.id) ? 'checked' : ''} ${unsupported ? 'disabled' : ''} aria-label="勾选 ${escapeHtml(node.name)}" />
         <div class="node-badge">${escapeHtml(badge)}</div>
         <div class="node-main">
@@ -344,7 +358,10 @@ function renderNodeList() {
         </div>
         ${tableRow ? `<div class="node-table-proxy">${proxy ? `<span class="proxy-status running-status">运行中</span><span>${escapeHtml(proxy.listen)}:${escapeHtml(proxy.port)}</span>${testOutput}` : '<span class="proxy-status">未启动</span>'}</div>` : ''}
         ${proxy ? `<button class="node-test" type="button" data-node-id="${node.id}" ${nodeTestPending.has(node.id) ? 'disabled' : ''}>${nodeTestPending.has(node.id) ? '测试中...' : '测试 IP / 延迟'}</button>` : ''}
-        <span class="node-action">${unsupported ? '不支持' : running ? '停止代理' : '启动代理'}</span>
+        <div class="node-action-group">
+          <span class="node-status">${unsupported ? '不支持' : running ? '运行中' : '未启动'}</span>
+          ${unsupported ? '' : `<button class="node-action-button ${running ? 'stop' : ''}" type="button" data-node-action="${running ? 'stop' : 'start'}" data-node-id="${node.id}">${running ? '停止代理' : '启动代理'}</button>`}
+        </div>
       </article>`;
   }).join('');
   updateNodeSelectionActions();
@@ -460,19 +477,28 @@ nodeList.addEventListener('click', async (event) => {
     await testNodeIp(testButton.dataset.nodeId);
     return;
   }
+  const actionButton = event.target.closest('.node-action-button');
+  if (actionButton) {
+    event.stopPropagation();
+    const node = nodeView.nodes.find((entry) => entry.id === actionButton.dataset.nodeId);
+    try {
+      if (actionButton.dataset.nodeAction === 'stop') {
+        if (!window.confirm(`确定关闭“${node.name}”的代理吗？关闭后会重启 sing-box。`)) return;
+        await window.nodeApi.stop(node.id);
+        selectedNodeIds.delete(node.id);
+      } else openNodeModal(node);
+      await loadNodeList();
+    } catch (error) {
+      await setMessage(error.message, 'error');
+    }
+    return;
+  }
   const item = event.target.closest('.node-item');
   if (!item || item.classList.contains('unsupported-item')) return;
-  try {
-    const node = nodeView.nodes.find((entry) => entry.id === item.dataset.id);
-    if (item.classList.contains('running')) {
-      if (!window.confirm(`确定关闭“${node.name}”的代理吗？关闭后会重启 sing-box。`)) return;
-      await window.nodeApi.stop(item.dataset.id);
-      selectedNodeIds.delete(item.dataset.id);
-    } else openNodeModal(node);
-    await loadNodeList();
-  } catch (error) {
-    await setMessage(error.message, 'error');
-  }
+  const node = nodeView.nodes.find((entry) => entry.id === item.dataset.id);
+  if (selectedNodeIds.has(node.id)) selectedNodeIds.delete(node.id);
+  else selectedNodeIds.add(node.id);
+  renderNodeList();
 });
 
 nodeList.addEventListener('change', (event) => {
