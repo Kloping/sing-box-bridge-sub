@@ -50,7 +50,7 @@ jobs:
           cache: npm
 
       - name: Check Node and lockfile
-        run: node -e "const lock=require('./package-lock.json'); const missing=Object.entries(lock.packages||{}).filter(([name,p])=>p && !p.version); if(missing.length){console.error('Lockfile entries missing version:', missing.map(([name])=>name).join(', ')); process.exit(1)} console.log('Node',process.version,'npm',require('child_process').execFileSync(process.platform==='win32'?'npm.cmd':'npm',['--version'],{encoding:'utf8'}).trim(),'lockfile',lock.lockfileVersion);"
+        run: node -e "const lock=require('./package-lock.json'); const missing=Object.entries(lock.packages||{}).filter(([name,p])=>p && !p.version); if(missing.length){console.error('Lockfile entries missing version:', missing.map(([name])=>name).join(', ')); process.exit(1)} console.log('Node',process.version,'lockfile',lock.lockfileVersion);"
 
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
