@@ -59,7 +59,7 @@ jobs:
         run: npm test
 
       - name: Build package
-        run: npm run dist -- ${{ matrix.args }}
+        run: npm run dist -- --publish never ${{ matrix.args }}
 
       - name: Upload package
         uses: actions/upload-artifact@v4
