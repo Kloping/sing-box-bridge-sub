@@ -20,24 +20,30 @@ jobs:
           - name: Windows x64
             os: windows-latest
             args: --win --x64
+            artifact_path: release/*.exe
           - name: Windows arm64
             os: windows-latest
             args: --win --arm64
+            artifact_path: release/*.exe
 #          - name: macOS x64
 #            os: macos-13
 #            args: --mac --x64
           - name: macOS arm64
             os: macos-14
             args: --mac --arm64
+            artifact_path: release/*.dmg
           - name: macOS universal
             os: macos-14
             args: --mac --universal
+            artifact_path: release/*.dmg
           - name: Linux x64
             os: ubuntu-22.04
             args: --linux --x64
+            artifact_path: release/*.AppImage
           - name: Linux arm64
             os: ubuntu-22.04
             args: --linux --arm64
+            artifact_path: release/*.AppImage
 
     steps:
       - name: Checkout
@@ -65,7 +71,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sing-box-bridge-sub-${{ matrix.name }}
-          path: release/
+          path: ${{ matrix.artifact_path }}
           if-no-files-found: error
           retention-days: 14
 
@@ -83,13 +89,28 @@ jobs:
         with:
           pattern: sing-box-bridge-sub-*
           path: release
-          merge-multiple: true
+          merge-multiple: false
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          mkdir -p publish
+          find release -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) -print0 |
+            while IFS= read -r -d '' file; do
+              artifact=$(basename "$(dirname "$file")")
+              base=$(basename "$file")
+              cp "$file" "publish/${artifact}-${base}"
+            done
+          test -n "$(find publish -type f -print -quit)"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          files: release/**
+          files: |
+            publish/*.exe
+            publish/*.dmg
+            publish/*.AppImage
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
