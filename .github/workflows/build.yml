@@ -1,0 +1,67 @@
+name: Build desktop packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            args: --win --x64
+          - name: Windows arm64
+            os: windows-latest
+            args: --win --arm64
+          - name: macOS x64
+            os: macos-13
+            args: --mac --x64
+          - name: macOS arm64
+            os: macos-14
+            args: --mac --arm64
+          - name: macOS universal
+            os: macos-14
+            args: --mac --universal
+          - name: Linux x64
+            os: ubuntu-22.04
+            args: --linux --x64
+          - name: Linux arm64
+            os: ubuntu-22.04
+            args: --linux --arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build package
+        run: npm run dist -- ${{ matrix.args }}
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: sing-box-bridge-sub-${{ matrix.name }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
