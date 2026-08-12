@@ -1,0 +1,51 @@
+:root {
+  color: #182230;
+  background: #f6f8fb;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; }
+
+.app-shell {
+  width: min(100% - 64px, 1000px);
+  margin: 0 auto;
+  padding: 48px 0;
+}
+
+.topbar, .hero, .stats { display: flex; align-items: center; }
+.topbar { justify-content: space-between; margin-bottom: 28px; }
+.topbar h1, h2, h3 { margin: 0; }
+.topbar h1 { font-size: 30px; letter-spacing: -0.03em; }
+.eyebrow { margin: 0 0 8px; color: #64748b; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; }
+.muted { color: #718096; line-height: 1.7; }
+
+.card { border: 1px solid #e5eaf1; border-radius: 18px; background: #fff; box-shadow: 0 10px 30px #2130470a; }
+.hero { justify-content: space-between; gap: 32px; padding: 36px; }
+.hero h2 { max-width: 560px; font-size: 26px; letter-spacing: -0.03em; }
+.hero p:last-child { margin: 12px 0 0; }
+
+.status { display: inline-flex; align-items: center; gap: 8px; color: #718096; font-size: 13px; }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; }
+button { border: 0; cursor: pointer; font: inherit; }
+.primary { flex: 0 0 auto; padding: 13px 18px; border-radius: 10px; color: #fff; background: #2563eb; font-weight: 600; }
+.primary:hover { background: #1d4ed8; }
+
+.stats { gap: 16px; margin: 16px 0; }
+.stat-card { display: grid; flex: 1; gap: 12px; padding: 22px 24px; }
+.stat-card strong { font-size: 28px; }
+.offline { color: #94a3b8; }
+.empty-state { display: grid; justify-items: center; padding: 72px 24px; text-align: center; }
+.empty-icon { display: grid; width: 52px; height: 52px; place-items: center; margin-bottom: 18px; border-radius: 14px; color: #2563eb; background: #eff6ff; font-size: 28px; }
+.empty-state h3 { font-size: 18px; }
+.empty-state p { margin: 8px 0 0; }
+
+@media (max-width: 680px) {
+  .app-shell { width: min(100% - 32px, 1000px); padding: 28px 0; }
+  .topbar, .hero { align-items: flex-start; flex-direction: column; }
+  .hero { padding: 24px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; }
+  .stat-card:last-child { grid-column: 1 / -1; }
+}

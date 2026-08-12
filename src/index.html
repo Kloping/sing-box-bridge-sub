@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sing-box Bridge Sub</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">SING-BOX BRIDGE SUB</p>
+          <h1>配置管理面板</h1>
+        </div>
+        <span class="status"><i></i>服务未启动</span>
+      </header>
+
+      <section class="hero card">
+        <div>
+          <p class="eyebrow">READY TO CONFIGURE</p>
+          <h2>开始管理你的订阅与桥接配置</h2>
+          <p class="muted">这是一个可跨平台运行的桌面应用骨架，业务功能可以从这里继续接入。</p>
+        </div>
+        <button id="actionButton" class="primary" type="button">创建第一条配置</button>
+      </section>
+
+      <section class="stats">
+        <article class="card stat-card">
+          <span class="muted">订阅数量</span>
+          <strong>0</strong>
+        </article>
+        <article class="card stat-card">
+          <span class="muted">桥接节点</span>
+          <strong>0</strong>
+        </article>
+        <article class="card stat-card">
+          <span class="muted">运行状态</span>
+          <strong class="offline">离线</strong>
+        </article>
+      </section>
+
+      <section class="card empty-state">
+        <div class="empty-icon">＋</div>
+        <h3>还没有配置</h3>
+        <p class="muted">点击上方按钮开始创建，后续可在这里查看和管理配置。</p>
+      </section>
+    </main>
+    <script src="./renderer.js"></script>
+  </body>
+</html>
