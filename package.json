@@ -26,7 +26,8 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "src/logo.png"
     },
     "mac": {
       "target": "dmg",
