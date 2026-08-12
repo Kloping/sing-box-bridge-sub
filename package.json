@@ -17,7 +17,7 @@
   },
   "build": {
     "appId": "com.kloping.singboxbridgesub",
-    "productName": "Sing-box Bridge Sub",
+    "productName": "sing box bridge sub",
     "directories": {
       "output": "release"
     },

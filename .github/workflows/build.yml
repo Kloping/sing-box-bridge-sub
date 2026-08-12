@@ -98,8 +98,17 @@ jobs:
           find release -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) -print0 |
             while IFS= read -r -d '' file; do
               artifact=$(basename "$(dirname "$file")")
-              base=$(basename "$file")
-              cp "$file" "publish/${artifact}-${base}"
+              case "$artifact" in
+                *Windows\ x64*) platform=win-x64 ;;
+                *Windows\ arm64*) platform=win-arm64 ;;
+                *macOS\ arm64*) platform=mac-arm64 ;;
+                *macOS\ universal*) platform=mac-universal ;;
+                *Linux\ x64*) platform=linux-x64 ;;
+                *Linux\ arm64*) platform=linux-arm64 ;;
+                *) echo "Unknown artifact: $artifact" >&2; exit 1 ;;
+              esac
+              extension="${file##*.}"
+              cp "$file" "publish/sing-box-bridge-sub-${platform}.${extension}"
             done
           test -n "$(find publish -type f -print -quit)"
 
