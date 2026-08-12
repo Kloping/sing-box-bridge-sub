@@ -41,6 +41,20 @@ const batchNodeSettingsList = document.querySelector('#batchNodeSettingsList');
 const batchNodeMessage = document.querySelector('#batchNodeMessage');
 const nodeListViewButton = document.querySelector('#nodeListViewButton');
 const nodeTableViewButton = document.querySelector('#nodeTableViewButton');
+const settingsRunningCount = document.querySelector('#settingsRunningCount');
+const settingsSubscriptionCount = document.querySelector('#settingsSubscriptionCount');
+const settingsNodeCount = document.querySelector('#settingsNodeCount');
+const settingsRuntimeStatus = document.querySelector('#settingsRuntimeStatus');
+const settingsCoreStatus = document.querySelector('#settingsCoreStatus');
+const settingsConfigPath = document.querySelector('#settingsConfigPath');
+const settingsCoreTarget = document.querySelector('#settingsCoreTarget');
+const defaultPortForm = document.querySelector('#defaultPortForm');
+const defaultPortInput = document.querySelector('#defaultPortInput');
+const settingsMessage = document.querySelector('#settingsMessage');
+const settingsDownloadCore = document.querySelector('#settingsDownloadCore');
+const settingsCleanupCore = document.querySelector('#settingsCleanupCore');
+const settingsOpenDownloadLog = document.querySelector('#settingsOpenDownloadLog');
+const settingsOpenCoreLog = document.querySelector('#settingsOpenCoreLog');
 
 let subscriptions = [];
 let nodeView = { runningNodeId: null, nodes: [] };
@@ -50,6 +64,7 @@ let nodeFilterStatus = 'all';
 let pendingNodeId = null;
 let selectedNodeIds = new Set();
 let downloadActive = false;
+let defaultPort = 12080;
 let nodeLayout = localStorage.getItem('nodeLayout') === 'table' ? 'table' : 'list';
 const nodeTestResults = new Map();
 const nodeTestPending = new Set();
@@ -144,6 +159,7 @@ function subscriptionCard(subscription) {
 
 function render() {
   count.textContent = subscriptions.length;
+  settingsSubscriptionCount.textContent = subscriptions.length;
   list.innerHTML = subscriptions.length
     ? subscriptions.map(subscriptionCard).join('')
     : `<div class="card empty-state">
@@ -261,6 +277,10 @@ async function loadNodeList() {
   if (nodeFilterSubscription !== 'all') filters.subscriptionId = nodeFilterSubscription;
   if (nodeFilterType !== 'all') filters.type = nodeFilterType;
   nodeView = await window.nodeApi.list(filters);
+  const allNodes = filters.subscriptionId || filters.type ? await window.nodeApi.list({}) : nodeView;
+  settingsNodeCount.textContent = allNodes.nodes.length;
+  settingsRunningCount.textContent = (allNodes.runningNodes || []).length;
+  settingsRuntimeStatus.textContent = allNodes.runningNodes?.length ? `运行中 · ${allNodes.runningNodes.length} 个节点` : '未运行';
   if (nodeFilterStatus !== 'all') {
     const runningIds = new Set((nodeView.runningNodes || []).map((proxy) => proxy.nodeId));
     nodeView.nodes = nodeView.nodes.filter((node) => runningIds.has(node.id) === (nodeFilterStatus === 'running'));
@@ -382,7 +402,7 @@ function closeNodeModal() {
 function openNodeModal(node) {
   pendingNodeId = node.id;
   nodeModalDescription.textContent = `为“${node.name}”设置本地代理监听参数。代理无认证，启动后会合并到当前 sing-box 配置并重启。`;
-  nodePortInput.value = 12080;
+  nodePortInput.value = defaultPort;
   nodeMessage.textContent = '';
   nodeModal.hidden = false;
   nodePortInput.focus();
@@ -398,7 +418,7 @@ function openBatchNodeModal() {
   const nodes = nodeView.nodes.filter((node) => selectedNodeIds.has(node.id) && node.supported);
   const runningById = new Map((nodeView.runningNodes || []).map((proxy) => [proxy.nodeId, proxy]));
   const usedPorts = new Set((nodeView.runningNodes || []).map((proxy) => proxy.port));
-  let nextPort = 12080;
+  let nextPort = defaultPort;
   batchNodeSettingsList.innerHTML = nodes.map((node) => {
     const current = runningById.get(node.id);
     if (current) return `<label class="batch-node-setting"><span>${escapeHtml(node.name)}</span><input type="number" min="1" max="65535" step="1" value="${current.port}" data-batch-node-id="${node.id}" required /></label>`;
@@ -542,6 +562,13 @@ function renderCoreStatus(status) {
   coreTarget.textContent = status.installed ? `已安装 · ${status.target}` : `${status.target} · 点击下载核心`;
   coreInstallButton.textContent = status.installed ? '重新下载' : '下载核心';
   coreInstallButton.disabled = false;
+  if (settingsCoreStatus) settingsCoreStatus.textContent = status.proxy?.nodes?.length ? `运行中 · ${status.proxy.nodes.length} 个节点` : status.installed ? '已安装，未运行' : '未安装';
+  if (settingsConfigPath) settingsConfigPath.textContent = status.proxy?.configPath || '未生成';
+  if (settingsCoreTarget) settingsCoreTarget.textContent = status.installed ? `已安装 · ${status.target}` : `${status.target} · 未安装`;
+  if (defaultPortInput && status.defaultPort) {
+    defaultPort = status.defaultPort;
+    defaultPortInput.value = defaultPort;
+  }
 }
 
 function showCoreModal(status) {
@@ -630,6 +657,13 @@ async function loadCoreStatus() {
   renderCoreStatus(await window.coreApi.getStatus());
 }
 
+async function loadSettings() {
+  if (!window.settingsApi) return;
+  const settings = await window.settingsApi.get();
+  defaultPort = settings.defaultPort;
+  defaultPortInput.value = defaultPort;
+}
+
 coreInstallButton.addEventListener('click', async () => showCoreModal(await window.coreApi.getStatus()));
 document.querySelector('#closeCoreModal').addEventListener('click', closeCoreModal);
 document.querySelector('#cancelCoreModal').addEventListener('click', closeCoreModal);
@@ -675,10 +709,50 @@ openLogButton.addEventListener('click', async () => {
   }
 });
 
+defaultPortForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  try {
+    defaultPort = (await window.settingsApi.setPort(Number(defaultPortInput.value))).defaultPort;
+    defaultPortInput.value = defaultPort;
+    settingsMessage.textContent = `默认代理端口已保存为 ${defaultPort}。`;
+    settingsMessage.className = 'form-message success';
+  } catch (error) {
+    settingsMessage.textContent = error.message;
+    settingsMessage.className = 'form-message error';
+  }
+});
+
+settingsDownloadCore.addEventListener('click', async () => showCoreModal(await window.coreApi.getStatus()));
+settingsOpenDownloadLog.addEventListener('click', async () => {
+  const error = await window.coreApi.openLog();
+  if (error) { settingsMessage.textContent = `打开日志失败：${error}`; settingsMessage.className = 'form-message error'; }
+});
+settingsOpenCoreLog.addEventListener('click', async () => {
+  const error = await window.coreApi.openCoreLog();
+  if (error) { settingsMessage.textContent = `打开日志失败：${error}`; settingsMessage.className = 'form-message error'; }
+});
+settingsCleanupCore.addEventListener('click', async () => {
+  if (!window.confirm('确定清理 sing-box 核心和运行配置吗？订阅和节点数据不会删除。')) return;
+  settingsCleanupCore.disabled = true;
+  try {
+    await window.coreApi.cleanup();
+    await loadCoreStatus();
+    settingsMessage.textContent = 'sing-box 核心和运行配置已清理。';
+    settingsMessage.className = 'form-message success';
+  } catch (error) {
+    settingsMessage.textContent = error.message;
+    settingsMessage.className = 'form-message error';
+  } finally {
+    settingsCleanupCore.disabled = false;
+  }
+});
+
 window.coreApi?.onDownloadEvent(renderDownloadEvent);
 window.nodeApi?.onStatus(async (status) => {
   renderCoreRuntimeStatus({ installed: true, runningNodes: status.runningNodes });
+  settingsCoreStatus.textContent = status.runningNodes?.length ? `运行中 · ${status.runningNodes.length} 个节点` : '已安装，未运行';
   await loadNodeList();
 });
 loadSubscriptions();
 loadCoreStatus();
+loadSettings();

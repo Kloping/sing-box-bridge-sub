@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('nodeApi', {
 contextBridge.exposeInMainWorld('coreApi', {
   getStatus: () => ipcRenderer.invoke('core:status'),
   openLog: () => ipcRenderer.invoke('core:open-log'),
+  openCoreLog: () => ipcRenderer.invoke('core:open-core-log'),
+  cleanup: () => ipcRenderer.invoke('core:cleanup'),
   startDownload: (downloadProxy) => ipcRenderer.invoke('core:download-start', downloadProxy),
   pauseDownload: () => ipcRenderer.invoke('core:download-pause'),
   resumeDownload: () => ipcRenderer.invoke('core:download-resume'),
@@ -33,4 +35,9 @@ contextBridge.exposeInMainWorld('coreApi', {
     ipcRenderer.on('core:download-event', listener);
     return () => ipcRenderer.removeListener('core:download-event', listener);
   }
+});
+
+contextBridge.exposeInMainWorld('settingsApi', {
+  get: () => ipcRenderer.invoke('settings:get'),
+  setPort: (port) => ipcRenderer.invoke('settings:set-port', port)
 });

@@ -69,8 +69,26 @@ button { border: 0; cursor: pointer; }
 .muted { margin: 8px 0 0; color: #7a889b; font-size: 13px; line-height: 1.7; }
 .header-status { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: #7a889b; font-size: 12px; }
 .card { border: 1px solid #e6ebf2; border-radius: 14px; background: #fff; box-shadow: 0 10px 30px #21304708; }
+.runtime-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
+.runtime-stat { display: grid; gap: 7px; padding: 20px 22px; }
+.runtime-stat span, .runtime-details span { color: #7a889b; font-size: 12px; }
+.runtime-stat strong { color: #26364d; font-size: 28px; letter-spacing: -0.04em; }
+.runtime-stat small { color: #9aa6b5; font-size: 11px; }
+.settings-card { margin-top: 18px; padding: 25px 28px 21px; }
+.runtime-details { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin-bottom: 20px; }
+.runtime-details div { display: grid; gap: 6px; min-width: 0; padding: 13px; border-radius: 9px; background: #f7f9fc; }
+.runtime-details strong { overflow: hidden; color: #34445b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.default-port-form { display: flex; align-items: end; gap: 13px; max-width: 440px; }
+.default-port-form label { flex: 1; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
 
 .import-card { padding: 25px 28px 21px; }
+.project-info-card { margin-top: 18px; padding: 20px 28px 18px; }
+.project-info-card .section-title { margin-bottom: 16px; }
+.project-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
+.project-info-grid div { display: grid; gap: 6px; min-width: 0; }
+.project-info-grid span { color: #7a889b; font-size: 12px; }
+.project-info-grid strong { overflow: hidden; color: #34445b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .section-title { display: flex; align-items: center; gap: 13px; margin-bottom: 23px; }
 .section-icon { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; color: #3478f6; background: #edf4ff; font-size: 22px; }
 h2, h3 { margin: 0; }
@@ -178,4 +196,8 @@ select { width: 100%; padding: 10px 12px; border: 1px solid #dce3ed; border-radi
   .view-switch button { flex: 1; }
   .settings-fields { grid-template-columns: 1fr; }
   .filter-card { grid-template-columns: 1fr; }
+  .runtime-stats, .runtime-details { grid-template-columns: 1fr; }
+  .project-info-grid { grid-template-columns: 1fr; }
+  .default-port-form { align-items: stretch; flex-direction: column; }
+  .settings-actions > button { flex: 1; }
 }

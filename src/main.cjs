@@ -8,6 +8,7 @@ const { once } = require('node:events');
 const extract = require('extract-zip');
 const { ProxyAgent } = require('undici');
 const { createSubscriptionService, maskUrl } = require('./main/subscription-service.cjs');
+const { readJson, writeJson } = require('./main/store.cjs');
 const { buildConfig, DEFAULT_LISTEN, DEFAULT_PORT } = require('./main/singbox.cjs');
 
 const repository = 'SagerNet/sing-box';
@@ -15,6 +16,7 @@ let mainWindow;
 let downloadJob;
 let proxyJob;
 const subscriptionService = createSubscriptionService(app.getPath('userData'));
+const settingsFile = path.join(app.getPath('userData'), 'settings.json');
 
 function getTarget() {
   const platformName = { win32: 'windows', linux: 'linux', darwin: 'darwin' }[process.platform];
@@ -58,6 +60,18 @@ function toPublicProxy(job) {
 function validateProxyPort(port) {
   const value = Number(port);
   if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error('代理端口必须是 1 到 65535 之间的整数');
+  return value;
+}
+
+async function getDefaultPort() {
+  const settings = await readJson(settingsFile, {});
+  try { return validateProxyPort(settings.defaultPort ?? DEFAULT_PORT); } catch { return DEFAULT_PORT; }
+}
+
+async function saveDefaultPort(port) {
+  const value = validateProxyPort(port);
+  const settings = await readJson(settingsFile, {});
+  await writeJson(settingsFile, { ...settings, defaultPort: value });
   return value;
 }
 
@@ -109,6 +123,7 @@ async function startProxy(nodeId, options = {}) {
 
 async function startProxyBatch(requests) {
   if (!Array.isArray(requests) || !requests.length) throw new Error('至少选择一个节点');
+  const defaultPort = await getDefaultPort();
   const selectedIds = new Set();
   const selectedNodes = [];
   for (const request of requests) {
@@ -118,7 +133,7 @@ async function startProxyBatch(requests) {
     if (!node) throw new Error('节点不存在');
     if (!node.supported) throw new Error(`${node.name}：${node.error || '节点不支持'}`);
     selectedIds.add(request.id);
-    selectedNodes.push({ ...node, proxyPort: validateProxyPort(request.port ?? DEFAULT_PORT), listen: DEFAULT_LISTEN, mode: request.mode || 'mixed' });
+    selectedNodes.push({ ...node, proxyPort: validateProxyPort(request.port ?? defaultPort), listen: DEFAULT_LISTEN, mode: request.mode || 'mixed' });
   }
   if (selectedNodes.some((node) => node.mode !== 'mixed')) throw new Error('当前仅支持 mixed 代理模式');
   const retainedNodes = proxyJob?.nodes.filter((node) => !selectedIds.has(node.id)) || [];
@@ -139,6 +154,15 @@ async function stopProxyNodes(nodeIds) {
   const nodes = proxyJob?.nodes.filter((node) => !ids.has(node.id)) || [];
   await restartProxy(nodes);
   return { runningNodes: nodes.map(toPublicProxy) };
+}
+
+async function cleanupCore() {
+  if (downloadJob) throw new Error('核心下载任务进行中，请先等待或撤销下载');
+  await stopProxy();
+  await fsp.rm(getInstallDirectory(), { recursive: true, force: true });
+  await fsp.rm(getRuntimeDirectory(), { recursive: true, force: true });
+  sendNodeStatus();
+  return { cleaned: true };
 }
 
 function maskProxy(proxyUrl) {
@@ -389,6 +413,7 @@ function createWindow() {
     icon: path.join(__dirname, 'logo.png'),
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.cjs') }
   });
+  mainWindow.removeMenu();
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 }
 
@@ -397,10 +422,16 @@ ipcMain.handle('core:status', async () => ({
   target: getTarget(),
   path: getExecutablePath(),
   logPath: getLogPath(),
+  coreLogPath: getCoreLogPath(),
+  defaultPort: await getDefaultPort(),
   proxy: proxyJob ? { nodes: proxyJob.nodes.map(toPublicProxy), configPath: getRuntimeConfigPath() } : null,
   download: downloadJob ? { status: downloadJob.status, received: downloadJob.received, total: downloadJob.total } : null
 }));
 ipcMain.handle('core:open-log', () => shell.openPath(getLogPath()));
+ipcMain.handle('core:open-core-log', () => shell.openPath(getCoreLogPath()));
+ipcMain.handle('core:cleanup', cleanupCore);
+ipcMain.handle('settings:get', async () => ({ defaultPort: await getDefaultPort() }));
+ipcMain.handle('settings:set-port', async (_event, port) => ({ defaultPort: await saveDefaultPort(port) }));
 ipcMain.handle('core:download-start', async (_event, downloadProxy) => {
   if (downloadJob) throw new Error('已有核心下载任务正在进行');
   downloadJob = { status: 'starting', downloadProxy: String(downloadProxy || '').trim(), received: 0, total: 0, pauseRequested: false, cancelled: false };
@@ -476,7 +507,7 @@ ipcMain.handle('node:list', async (_event, filters) => {
 ipcMain.handle('node:start', async (_event, payload = {}) => {
   if (Array.isArray(payload.nodes)) return startProxyBatch(payload.nodes);
   if (typeof payload.id !== 'string' || !payload.id) throw new Error('无效的节点 ID');
-  return startProxy(payload.id, payload);
+  return startProxy(payload.id, { ...payload, port: payload.port ?? await getDefaultPort() });
 });
 ipcMain.handle('node:stop', async (_event, id) => {
   return stopProxyNodes(Array.isArray(id) ? id : [id]);

@@ -19,9 +19,9 @@
         </div>
 
         <nav class="nav" aria-label="主导航">
-          <a class="nav-item active" href="#subscriptions"><span>▤</span>订阅管理</a>
+          <a class="nav-item" href="#subscriptions"><span>▤</span>订阅管理</a>
           <a class="nav-item" href="#nodes"><span>⌁</span>节点列表</a>
-          <a class="nav-item" href="#settings"><span>⚙</span>运行设置</a>
+          <a class="nav-item active" href="#settings"><span>⚙</span>运行设置</a>
         </nav>
 
         <div class="core-card">
@@ -41,7 +41,7 @@
         </div>
       </aside>
 
-      <section class="content" id="subscriptions">
+      <section class="content" id="subscriptions" hidden>
         <header class="page-header">
           <div>
             <p class="eyebrow">SUBSCRIPTIONS</p>
@@ -136,6 +136,61 @@
         </div>
 
         <section id="nodeList" class="node-list" aria-live="polite"></section>
+      </section>
+
+      <section class="content" id="settings">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">RUNTIME SETTINGS</p>
+            <h1>运行设置</h1>
+            <p class="muted">查看节点、订阅和 sing-box 运行状态，管理核心与默认代理端口。</p>
+          </div>
+          <div class="header-status"><i></i><span id="settingsRuntimeStatus">检查中...</span></div>
+        </header>
+
+        <section class="runtime-stats">
+          <article class="card runtime-stat"><span>当前开启节点</span><strong id="settingsRunningCount">0</strong><small>sing-box 正在代理的节点</small></article>
+          <article class="card runtime-stat"><span>导入订阅</span><strong id="settingsSubscriptionCount">0</strong><small>已保存的订阅数量</small></article>
+          <article class="card runtime-stat"><span>已导入节点</span><strong id="settingsNodeCount">0</strong><small>订阅解析得到的节点</small></article>
+        </section>
+
+        <section class="card project-info-card">
+          <div class="section-title">
+            <div class="section-icon">ⓘ</div>
+            <div>
+              <h2>关于本项目</h2>
+              <p class="muted">Sing-box Bridge Sub</p>
+            </div>
+          </div>
+          <div class="project-info-grid">
+            <div><span>当前版本</span><strong>0.1</strong></div>
+            <div><span>作者</span><strong>github@kloping</strong></div>
+            <div><span>开源许可遵循</span><strong>PolyForm Noncommercial License 1.0.0</strong></div>
+          </div>
+        </section>
+
+        <section class="card settings-card">
+          <div class="section-title">
+            <div class="section-icon">⚙</div>
+            <div><h2>代理与核心</h2><p class="muted">端口只影响新启动的节点，已开启节点保持当前端口。</p></div>
+          </div>
+          <div class="runtime-details">
+            <div><span>sing-box 检测</span><strong id="settingsCoreStatus">检查中...</strong></div>
+            <div><span>运行配置</span><strong id="settingsConfigPath">未生成</strong></div>
+            <div><span>核心版本目标</span><strong id="settingsCoreTarget">检查中...</strong></div>
+          </div>
+          <form id="defaultPortForm" class="default-port-form">
+            <label><span>默认代理端口</span><input id="defaultPortInput" type="number" min="1" max="65535" step="1" required /></label>
+            <button class="primary" type="submit">保存端口</button>
+          </form>
+          <p id="settingsMessage" class="form-message" role="status"></p>
+          <div class="settings-actions">
+            <button id="settingsDownloadCore" class="primary" type="button">下载/更新核心</button>
+            <button id="settingsCleanupCore" class="danger" type="button">清理核心</button>
+            <button id="settingsOpenDownloadLog" class="secondary" type="button">下载日志</button>
+            <button id="settingsOpenCoreLog" class="secondary" type="button">运行日志</button>
+          </div>
+        </section>
       </section>
     </main>
 
