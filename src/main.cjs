@@ -104,19 +104,41 @@ async function restartProxy(nodes) {
 }
 
 async function startProxy(nodeId, options = {}) {
-  const node = await subscriptionService.getNode(nodeId);
-  if (!node) throw new Error('节点不存在');
-  if (!node.supported) throw new Error(node.error || '节点不支持');
-  const listen = DEFAULT_LISTEN;
-  const port = validateProxyPort(options.port ?? DEFAULT_PORT);
-  const mode = String(options.mode || 'mixed');
-  if (mode !== 'mixed') throw new Error('当前仅支持 mixed 代理模式');
-  const nodes = proxyJob?.nodes.filter((item) => item.id !== nodeId) || [];
-  if (nodes.some((item) => item.proxyPort === port)) throw new Error(`端口 ${port} 已被其他节点占用`);
-  nodes.push({ ...node, proxyPort: port, listen, mode });
+  return startProxyBatch([{ id: nodeId, port: options.port, mode: options.mode }]);
+}
+
+async function startProxyBatch(requests) {
+  if (!Array.isArray(requests) || !requests.length) throw new Error('至少选择一个节点');
+  const selectedIds = new Set();
+  const selectedNodes = [];
+  for (const request of requests) {
+    if (!request || typeof request.id !== 'string' || !request.id) throw new Error('无效的节点 ID');
+    if (selectedIds.has(request.id)) continue;
+    const node = await subscriptionService.getNode(request.id);
+    if (!node) throw new Error('节点不存在');
+    if (!node.supported) throw new Error(`${node.name}：${node.error || '节点不支持'}`);
+    selectedIds.add(request.id);
+    selectedNodes.push({ ...node, proxyPort: validateProxyPort(request.port ?? DEFAULT_PORT), listen: DEFAULT_LISTEN, mode: request.mode || 'mixed' });
+  }
+  if (selectedNodes.some((node) => node.mode !== 'mixed')) throw new Error('当前仅支持 mixed 代理模式');
+  const retainedNodes = proxyJob?.nodes.filter((node) => !selectedIds.has(node.id)) || [];
+  const nodes = [...retainedNodes, ...selectedNodes];
+  const ports = new Set();
+  for (const node of nodes) {
+    if (ports.has(node.proxyPort)) throw new Error(`端口 ${node.proxyPort} 被多个节点使用`);
+    ports.add(node.proxyPort);
+  }
   await restartProxy(nodes);
-  await subscriptionService.selectNode(nodeId);
-  return toPublicProxy(nodes.find((item) => item.id === nodeId));
+  await subscriptionService.selectNode(selectedNodes[selectedNodes.length - 1].id);
+  return { runningNodes: nodes.map(toPublicProxy) };
+}
+
+async function stopProxyNodes(nodeIds) {
+  if (!Array.isArray(nodeIds) || !nodeIds.length) throw new Error('至少选择一个节点');
+  const ids = new Set(nodeIds);
+  const nodes = proxyJob?.nodes.filter((node) => !ids.has(node.id)) || [];
+  await restartProxy(nodes);
+  return { runningNodes: nodes.map(toPublicProxy) };
 }
 
 function maskProxy(proxyUrl) {
@@ -418,15 +440,13 @@ ipcMain.handle('node:list', async (_event, filters) => {
   const running = new Map((proxyJob?.nodes || []).map((node) => [node.id, toPublicProxy(node)]));
   return { selectedNodeId, runningNodes: [...running.values()], nodes: nodes.map(toPublicNode) };
 });
-ipcMain.handle('node:start', async (_event, { id, port, mode } = {}) => {
-  if (typeof id !== 'string' || !id) throw new Error('无效的节点 ID');
-  return startProxy(id, { port, mode });
+ipcMain.handle('node:start', async (_event, payload = {}) => {
+  if (Array.isArray(payload.nodes)) return startProxyBatch(payload.nodes);
+  if (typeof payload.id !== 'string' || !payload.id) throw new Error('无效的节点 ID');
+  return startProxy(payload.id, payload);
 });
 ipcMain.handle('node:stop', async (_event, id) => {
-  if (typeof id !== 'string' || !id) throw new Error('无效的节点 ID');
-  const nodes = proxyJob?.nodes.filter((node) => node.id !== id) || [];
-  await restartProxy(nodes);
-  return { runningNodes: nodes.map(toPublicProxy) };
+  return stopProxyNodes(Array.isArray(id) ? id : [id]);
 });
 
 app.whenReady().then(() => {

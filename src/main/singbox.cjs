@@ -1,7 +1,7 @@
 const fs = require('node:fs/promises');
 
 const DEFAULT_LISTEN = '127.0.0.1';
-const DEFAULT_PORT = 2080;
+const DEFAULT_PORT = 12080;
 
 function value(raw, ...keys) {
   return keys.map((key) => raw[key]).find((item) => item !== undefined && item !== null && item !== '');

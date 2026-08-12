@@ -4,6 +4,9 @@ const count = document.querySelector('#subscriptionCount');
 const message = document.querySelector('#formMessage');
 const refreshAllButton = document.querySelector('#refreshAllButton');
 const coreStatus = document.querySelector('#coreStatus');
+const coreRuntimeDot = document.querySelector('#coreRuntimeDot');
+const coreDownloadStatus = document.querySelector('#coreDownloadStatus');
+const coreDownloadDot = document.querySelector('#coreDownloadDot');
 const coreTarget = document.querySelector('#coreTarget');
 const coreInstallButton = document.querySelector('#coreInstallButton');
 const coreModal = document.querySelector('#coreModal');
@@ -29,6 +32,13 @@ const nodeSettingsForm = document.querySelector('#nodeSettingsForm');
 const nodeModalDescription = document.querySelector('#nodeModalDescription');
 const nodePortInput = document.querySelector('#nodePortInput');
 const nodeMessage = document.querySelector('#nodeMessage');
+const nodeSelectionLabel = document.querySelector('#nodeSelectionLabel');
+const startSelectedNodesButton = document.querySelector('#startSelectedNodesButton');
+const stopSelectedNodesButton = document.querySelector('#stopSelectedNodesButton');
+const batchNodeModal = document.querySelector('#batchNodeModal');
+const batchNodeSettingsForm = document.querySelector('#batchNodeSettingsForm');
+const batchNodeSettingsList = document.querySelector('#batchNodeSettingsList');
+const batchNodeMessage = document.querySelector('#batchNodeMessage');
 
 let subscriptions = [];
 let nodeView = { runningNodeId: null, nodes: [] };
@@ -36,6 +46,7 @@ let nodeFilterSubscription = 'all';
 let nodeFilterType = 'all';
 let nodeFilterStatus = 'all';
 let pendingNodeId = null;
+let selectedNodeIds = new Set();
 let downloadActive = false;
 
 function escapeHtml(value) {
@@ -244,6 +255,7 @@ function renderNodeList() {
     const unsupported = !node.supported;
     return `
       <article class="card node-item ${running ? 'running' : ''} ${unsupported ? 'unsupported-item' : ''}" data-id="${node.id}" role="button" tabindex="${unsupported ? '-1' : '0'}" aria-disabled="${unsupported}">
+        <input class="node-check" type="checkbox" data-node-id="${node.id}" ${selectedNodeIds.has(node.id) ? 'checked' : ''} ${unsupported ? 'disabled' : ''} aria-label="勾选 ${escapeHtml(node.name)}" />
         <div class="node-badge">${escapeHtml(badge)}</div>
         <div class="node-main">
           <h3>${escapeHtml(node.name)}${running ? ' <span class="selected-tag">代理运行中</span>' : ''}</h3>
@@ -253,6 +265,14 @@ function renderNodeList() {
         <span class="node-action">${unsupported ? '不支持' : running ? '停止代理' : '启动代理'}</span>
       </article>`;
   }).join('');
+  updateNodeSelectionActions();
+}
+
+function updateNodeSelectionActions() {
+  const count = selectedNodeIds.size;
+  nodeSelectionLabel.textContent = `已勾选 ${count} 个节点`;
+  startSelectedNodesButton.disabled = count === 0;
+  stopSelectedNodesButton.disabled = count === 0;
 }
 
 nodeSubscriptionFilter.addEventListener('change', async () => {
@@ -279,20 +299,70 @@ function closeNodeModal() {
 function openNodeModal(node) {
   pendingNodeId = node.id;
   nodeModalDescription.textContent = `为“${node.name}”设置本地代理监听参数。代理无认证，启动后会合并到当前 sing-box 配置并重启。`;
-  nodePortInput.value = 2080;
+  nodePortInput.value = 12080;
   nodeMessage.textContent = '';
   nodeModal.hidden = false;
   nodePortInput.focus();
   nodePortInput.select();
 }
 
+function closeBatchNodeModal() {
+  batchNodeModal.hidden = true;
+  batchNodeMessage.textContent = '';
+}
+
+function openBatchNodeModal() {
+  const nodes = nodeView.nodes.filter((node) => selectedNodeIds.has(node.id) && node.supported);
+  const runningById = new Map((nodeView.runningNodes || []).map((proxy) => [proxy.nodeId, proxy]));
+  const usedPorts = new Set((nodeView.runningNodes || []).map((proxy) => proxy.port));
+  let nextPort = 12080;
+  batchNodeSettingsList.innerHTML = nodes.map((node) => {
+    const current = runningById.get(node.id);
+    if (current) return `<label class="batch-node-setting"><span>${escapeHtml(node.name)}</span><input type="number" min="1" max="65535" step="1" value="${current.port}" data-batch-node-id="${node.id}" required /></label>`;
+    while (usedPorts.has(nextPort)) nextPort += 1;
+    const port = nextPort++;
+    usedPorts.add(port);
+    return `<label class="batch-node-setting"><span>${escapeHtml(node.name)}</span><input type="number" min="1" max="65535" step="1" value="${port}" data-batch-node-id="${node.id}" required /></label>`;
+  }).join('');
+  batchNodeMessage.textContent = '';
+  batchNodeModal.hidden = false;
+}
+
 nodeList.addEventListener('click', async (event) => {
+  if (event.target.closest('.node-check')) return;
   const item = event.target.closest('.node-item');
   if (!item || item.classList.contains('unsupported-item')) return;
   try {
     const node = nodeView.nodes.find((entry) => entry.id === item.dataset.id);
-    if (item.classList.contains('running')) await window.nodeApi.stop(item.dataset.id);
-    else openNodeModal(node);
+    if (item.classList.contains('running')) {
+      if (!window.confirm(`确定关闭“${node.name}”的代理吗？关闭后会重启 sing-box。`)) return;
+      await window.nodeApi.stop(item.dataset.id);
+      selectedNodeIds.delete(item.dataset.id);
+    } else openNodeModal(node);
+    await loadNodeList();
+  } catch (error) {
+    await setMessage(error.message, 'error');
+  }
+});
+
+nodeList.addEventListener('change', (event) => {
+  const checkbox = event.target.closest('.node-check');
+  if (!checkbox) return;
+  if (checkbox.checked) selectedNodeIds.add(checkbox.dataset.nodeId);
+  else selectedNodeIds.delete(checkbox.dataset.nodeId);
+  updateNodeSelectionActions();
+});
+
+startSelectedNodesButton.addEventListener('click', openBatchNodeModal);
+
+stopSelectedNodesButton.addEventListener('click', async () => {
+  const nodes = nodeView.nodes.filter((node) => selectedNodeIds.has(node.id));
+  const running = nodes.filter((node) => (nodeView.runningNodes || []).some((proxy) => proxy.nodeId === node.id));
+  if (!running.length) return;
+  if (!window.confirm(`确定关闭选中的 ${running.length} 个节点代理吗？关闭后会重启 sing-box。`)) return;
+  try {
+    await window.nodeApi.stop(running.map((node) => node.id));
+    running.forEach((node) => selectedNodeIds.delete(node.id));
     await loadNodeList();
   } catch (error) {
     await setMessage(error.message, 'error');
@@ -318,6 +388,27 @@ nodeModal.addEventListener('click', (event) => {
   if (event.target === nodeModal) closeNodeModal();
 });
 
+batchNodeSettingsForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  batchNodeMessage.textContent = '';
+  try {
+    const nodes = [...batchNodeSettingsList.querySelectorAll('[data-batch-node-id]')].map((input) => ({ id: input.dataset.batchNodeId, port: Number(input.value), mode: 'mixed' }));
+    await window.nodeApi.start({ nodes });
+    selectedNodeIds.clear();
+    closeBatchNodeModal();
+    await loadNodeList();
+  } catch (error) {
+    batchNodeMessage.textContent = error.message;
+    batchNodeMessage.className = 'form-message error';
+  }
+});
+
+document.querySelector('#closeBatchNodeModal').addEventListener('click', closeBatchNodeModal);
+document.querySelector('#cancelBatchNodeModal').addEventListener('click', closeBatchNodeModal);
+batchNodeModal.addEventListener('click', (event) => {
+  if (event.target === batchNodeModal) closeBatchNodeModal();
+});
+
 nodeList.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' && event.key !== ' ') return;
   const item = event.target.closest('.node-item');
@@ -336,8 +427,29 @@ document.querySelectorAll('.nav-item').forEach((navItem) => {
   });
 });
 
+function setStatusDot(dot, status) {
+  dot.className = `core-status-dot status-${status}`;
+}
+
+function renderCoreRuntimeStatus(status) {
+  const runningCount = status.proxy?.nodes?.length || status.runningNodes?.length || 0;
+  coreStatus.textContent = runningCount ? `运行中（${runningCount} 个代理）` : status.installed ? '已停止' : '未安装';
+  setStatusDot(coreRuntimeDot, runningCount ? 'green' : status.installed ? 'gray' : 'red');
+}
+
+function renderCoreDownloadStatus(status, fallbackInstalled = false) {
+  const labels = {
+    starting: '准备下载', ready: '准备下载', downloading: '下载中', paused: '已暂停',
+    extracting: '安装中', complete: '已完成', cancelled: '已撤销', error: '下载失败'
+  };
+  const value = status?.status || (fallbackInstalled ? 'complete' : 'not-installed');
+  coreDownloadStatus.textContent = labels[value] || '未下载';
+  setStatusDot(coreDownloadDot, value === 'complete' ? 'green' : ['starting', 'ready', 'downloading', 'paused', 'extracting'].includes(value) ? 'blue' : ['error', 'cancelled'].includes(value) ? 'red' : 'gray');
+}
+
 function renderCoreStatus(status) {
-  coreStatus.textContent = status.installed ? '已安装' : '未安装';
+  renderCoreRuntimeStatus(status);
+  renderCoreDownloadStatus(status.download, status.installed);
   coreTarget.textContent = status.installed ? `已安装 · ${status.target}` : `${status.target} · 点击下载核心`;
   coreInstallButton.textContent = status.installed ? '重新下载' : '下载核心';
   coreInstallButton.disabled = false;
@@ -367,6 +479,7 @@ function formatBytes(bytes) {
 }
 
 function renderDownloadEvent(event) {
+  renderCoreDownloadStatus(event);
   if (event.phase === 'ready') {
     progressPanel.hidden = false;
     downloadStatus.textContent = `准备下载 ${event.version || ''}`;
@@ -419,6 +532,9 @@ function renderDownloadEvent(event) {
 async function loadCoreStatus() {
   if (!window.coreApi) {
     coreStatus.textContent = '开发模式';
+    coreDownloadStatus.textContent = '不可用';
+    setStatusDot(coreRuntimeDot, 'gray');
+    setStatusDot(coreDownloadDot, 'gray');
     coreTarget.textContent = '请通过 Electron 启动';
     return;
   }
@@ -471,6 +587,9 @@ openLogButton.addEventListener('click', async () => {
 });
 
 window.coreApi?.onDownloadEvent(renderDownloadEvent);
-window.nodeApi?.onStatus(loadNodeList);
+window.nodeApi?.onStatus(async (status) => {
+  renderCoreRuntimeStatus({ installed: true, runningNodes: status.runningNodes });
+  await loadNodeList();
+});
 loadSubscriptions();
 loadCoreStatus();

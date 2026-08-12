@@ -26,7 +26,16 @@
 
         <div class="core-card">
           <div class="core-heading"><span class="pulse"></span><span>sing-box 核心</span></div>
-          <strong id="coreStatus">检查中...</strong>
+          <div class="core-status-row">
+            <i id="coreRuntimeDot" class="core-status-dot status-gray"></i>
+            <span>运行状态</span>
+            <strong id="coreStatus">检查中...</strong>
+          </div>
+          <div class="core-status-row">
+            <i id="coreDownloadDot" class="core-status-dot status-gray"></i>
+            <span>下载状态</span>
+            <strong id="coreDownloadStatus">检查中...</strong>
+          </div>
           <span id="coreTarget">正在识别平台</span>
           <button id="coreInstallButton" class="core-install" type="button">下载核心</button>
         </div>
@@ -114,6 +123,14 @@
           </label>
         </section>
 
+        <div class="node-bulk-actions">
+          <span id="nodeSelectionLabel" class="muted">已勾选 0 个节点</span>
+          <div>
+            <button id="startSelectedNodesButton" class="primary" type="button" disabled>批量开启</button>
+            <button id="stopSelectedNodesButton" class="danger" type="button" disabled>批量关闭</button>
+          </div>
+        </div>
+
         <section id="nodeList" class="node-list" aria-live="polite"></section>
       </section>
     </main>
@@ -181,13 +198,35 @@
             </label>
             <label>
               <span>代理端口</span>
-              <input id="nodePortInput" name="port" type="number" min="1" max="65535" step="1" value="2080" required />
+              <input id="nodePortInput" name="port" type="number" min="1" max="65535" step="1" value="12080" required />
             </label>
           </div>
           <p id="nodeMessage" class="form-message" role="status"></p>
           <div class="modal-actions">
             <button id="cancelNodeModal" class="secondary" type="button">取消</button>
             <button class="primary" type="submit">启动代理</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div id="batchNodeModal" class="modal-backdrop" hidden>
+      <section class="modal card" role="dialog" aria-modal="true" aria-labelledby="batchNodeModalTitle">
+        <button id="closeBatchNodeModal" class="modal-close" type="button" aria-label="关闭">×</button>
+        <div class="modal-heading">
+          <div class="section-icon">↗</div>
+          <div>
+            <p class="eyebrow">BATCH NODE PROXY</p>
+            <h2 id="batchNodeModalTitle">批量开启节点</h2>
+          </div>
+        </div>
+        <form id="batchNodeSettingsForm">
+          <p class="modal-description">每个节点使用一个本地 mixed 无认证代理端口，确认后会合并配置并重启 sing-box。</p>
+          <div id="batchNodeSettingsList" class="batch-node-settings-list"></div>
+          <p id="batchNodeMessage" class="form-message" role="status"></p>
+          <div class="modal-actions">
+            <button id="cancelBatchNodeModal" class="secondary" type="button">取消</button>
+            <button class="primary" type="submit">确认开启</button>
           </div>
         </form>
       </section>
