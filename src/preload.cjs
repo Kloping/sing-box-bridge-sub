@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('nodeApi', {
 
 contextBridge.exposeInMainWorld('coreApi', {
   getStatus: () => ipcRenderer.invoke('core:status'),
+  saveConfig: () => ipcRenderer.invoke('core:save-config'),
   openLog: () => ipcRenderer.invoke('core:open-log'),
   openCoreLog: () => ipcRenderer.invoke('core:open-core-log'),
   cleanup: () => ipcRenderer.invoke('core:cleanup'),

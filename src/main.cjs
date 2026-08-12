@@ -1,5 +1,6 @@
 ﻿const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn, spawnSync } = require('node:child_process');
+const { dialog } = require('electron');
 const fs = require('node:fs');
 const fsp = fs.promises;
 const path = require('node:path');
@@ -427,6 +428,17 @@ ipcMain.handle('core:status', async () => ({
   proxy: proxyJob ? { nodes: proxyJob.nodes.map(toPublicProxy), configPath: getRuntimeConfigPath() } : null,
   download: downloadJob ? { status: downloadJob.status, received: downloadJob.received, total: downloadJob.total } : null
 }));
+ipcMain.handle('core:save-config', async () => {
+  if (!proxyJob) throw new Error('代理尚未开启');
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '保存 sing-box 配置',
+    defaultPath: 'config.json',
+    filters: [{ name: 'JSON 配置文件', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  await fsp.copyFile(getRuntimeConfigPath(), result.filePath);
+  return { canceled: false, path: result.filePath };
+});
 ipcMain.handle('core:open-log', () => shell.openPath(getLogPath()));
 ipcMain.handle('core:open-core-log', () => shell.openPath(getCoreLogPath()));
 ipcMain.handle('core:cleanup', cleanupCore);

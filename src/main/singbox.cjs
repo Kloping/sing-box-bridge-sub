@@ -9,7 +9,7 @@ function value(raw, ...keys) {
 
 function tlsConfig(raw) {
   if (raw.tls && typeof raw.tls === 'object') return raw.tls;
-  if (!raw.tls) return undefined;
+  if (!raw.tls && !raw.sni && !raw.servername && !raw['skip-cert-verify']) return undefined;
   return {
     enabled: true,
     server_name: value(raw, 'sni', 'servername'),
@@ -40,7 +40,7 @@ function buildOutbound(node, tag = 'selected-node') {
     case 'trojan': return { type: 'trojan', ...base, password: raw.password, tls: tlsConfig(raw), transport: transportConfig(raw) };
     case 'socks5': return { type: 'socks', ...base, username: raw.username, password: raw.password };
     case 'http': return { type: 'http', ...base, username: raw.username, password: raw.password };
-    case 'hysteria2': return { type: 'hysteria2', ...base, password: raw.password, up_mbps: raw.up || raw.up_mbps, down_mbps: raw.down || raw.down_mbps, obfs: raw.obfs ? { type: raw.obfs, password: raw['obfs-password'] || raw.obfs_password } : undefined, tls: tlsConfig(raw) };
+    case 'hysteria2': return { type: 'hysteria2', ...base, server_ports: raw.server_ports, password: raw.password, up_mbps: raw.up || raw.up_mbps, down_mbps: raw.down || raw.down_mbps, obfs: raw.obfs ? { type: raw.obfs, password: raw['obfs-password'] || raw.obfs_password } : undefined, tls: tlsConfig(raw) };
     default: throw new Error(`不支持的节点协议：${node.type}`);
   }
 }

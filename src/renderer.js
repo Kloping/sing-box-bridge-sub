@@ -41,6 +41,7 @@ const batchNodeSettingsList = document.querySelector('#batchNodeSettingsList');
 const batchNodeMessage = document.querySelector('#batchNodeMessage');
 const nodeListViewButton = document.querySelector('#nodeListViewButton');
 const nodeTableViewButton = document.querySelector('#nodeTableViewButton');
+const nodeSelectionMenu = document.querySelector('.node-selection-menu');
 const settingsRunningCount = document.querySelector('#settingsRunningCount');
 const settingsSubscriptionCount = document.querySelector('#settingsSubscriptionCount');
 const settingsNodeCount = document.querySelector('#settingsNodeCount');
@@ -55,6 +56,7 @@ const settingsDownloadCore = document.querySelector('#settingsDownloadCore');
 const settingsCleanupCore = document.querySelector('#settingsCleanupCore');
 const settingsOpenDownloadLog = document.querySelector('#settingsOpenDownloadLog');
 const settingsOpenCoreLog = document.querySelector('#settingsOpenCoreLog');
+const settingsSaveConfig = document.querySelector('#settingsSaveConfig');
 
 let subscriptions = [];
 let nodeView = { runningNodeId: null, nodes: [] };
@@ -357,6 +359,25 @@ function setNodeLayout(layout) {
 nodeListViewButton.addEventListener('click', () => setNodeLayout('list'));
 nodeTableViewButton.addEventListener('click', () => setNodeLayout('table'));
 
+function updateNodeSelection(action) {
+  const runningIds = new Set((nodeView.runningNodes || []).map((proxy) => proxy.nodeId));
+  const nodes = nodeView.nodes.filter((node) => node.supported);
+  if (action === 'none') selectedNodeIds.clear();
+  else if (action === 'invert') nodes.forEach((node) => selectedNodeIds.has(node.id) ? selectedNodeIds.delete(node.id) : selectedNodeIds.add(node.id));
+  else nodes.forEach((node) => {
+    const matches = action === 'all' || (action === 'running' ? runningIds.has(node.id) : !runningIds.has(node.id));
+    if (matches) selectedNodeIds.add(node.id);
+    else if (action !== 'all') selectedNodeIds.delete(node.id);
+  });
+  renderNodeList();
+  nodeSelectionMenu.open = false;
+}
+
+nodeSelectionMenu.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-selection-action]');
+  if (button) updateNodeSelection(button.dataset.selectionAction);
+});
+
 async function testNodeIp(nodeId) {
   nodeTestPending.add(nodeId);
   nodeTestResults.delete(nodeId);
@@ -544,6 +565,7 @@ function renderCoreRuntimeStatus(status) {
   const runningCount = status.proxy?.nodes?.length || status.runningNodes?.length || 0;
   coreStatus.textContent = runningCount ? `运行中（${runningCount} 个代理）` : status.installed ? '已停止' : '未安装';
   setStatusDot(coreRuntimeDot, runningCount ? 'green' : status.installed ? 'gray' : 'red');
+  if (settingsSaveConfig) settingsSaveConfig.disabled = !runningCount;
 }
 
 function renderCoreDownloadStatus(status, fallbackInstalled = false) {
@@ -570,6 +592,19 @@ function renderCoreStatus(status) {
     defaultPortInput.value = defaultPort;
   }
 }
+
+settingsSaveConfig.addEventListener('click', async () => {
+  try {
+    const result = await window.coreApi.saveConfig();
+    if (!result.canceled) {
+      settingsMessage.textContent = `配置已保存到：${result.path}`;
+      settingsMessage.className = 'form-message success';
+    }
+  } catch (error) {
+    settingsMessage.textContent = error.message;
+    settingsMessage.className = 'form-message error';
+  }
+});
 
 function showCoreModal(status) {
   downloadProxyInput.value = '';

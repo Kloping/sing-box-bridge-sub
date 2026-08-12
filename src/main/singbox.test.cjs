@@ -22,3 +22,26 @@ test('builds a mixed unauthenticated local proxy from the default template', asy
   ]);
   assert.equal(config.route.final, 'direct');
 });
+
+test('builds hysteria2 TLS from Clash fields and preserves server ports', async () => {
+  const config = await buildConfig({
+    type: 'hysteria2',
+    server: 'aws-linkhy1.liangxin1.xyz',
+    port: 60000,
+    raw: {
+      password: 'secret',
+      sni: 'iosapps.itunes.apple.com',
+      'skip-cert-verify': true,
+      server_ports: ['60000:65530']
+    }
+  }, path.join(__dirname, '..', 'test', 'config.json'));
+  assert.deepEqual(config.outbounds[0], {
+    type: 'hysteria2',
+    tag: 'selected-node-1',
+    server: 'aws-linkhy1.liangxin1.xyz',
+    server_port: 60000,
+    server_ports: ['60000:65530'],
+    password: 'secret',
+    tls: { enabled: true, server_name: 'iosapps.itunes.apple.com', insecure: true }
+  });
+});

@@ -130,6 +130,16 @@
               <button id="nodeListViewButton" class="secondary active" type="button" data-view="list" aria-pressed="true">列表</button>
               <button id="nodeTableViewButton" class="secondary" type="button" data-view="table" aria-pressed="false">表格</button>
             </div>
+            <details class="node-selection-menu">
+              <summary class="secondary">选择操作</summary>
+              <div class="node-selection-options">
+                <button type="button" data-selection-action="all">选择全部</button>
+                <button type="button" data-selection-action="running">选择全部已开启节点</button>
+                <button type="button" data-selection-action="stopped">选择全部未开启节点</button>
+                <button type="button" data-selection-action="none">取消全选</button>
+                <button type="button" data-selection-action="invert">反选</button>
+              </div>
+            </details>
             <button id="startSelectedNodesButton" class="primary" type="button" disabled>批量开启</button>
             <button id="stopSelectedNodesButton" class="danger" type="button" disabled>批量关闭</button>
           </div>
@@ -179,6 +189,7 @@
             <div><span>运行配置</span><strong id="settingsConfigPath">未生成</strong></div>
             <div><span>核心版本目标</span><strong id="settingsCoreTarget">检查中...</strong></div>
           </div>
+          <button id="settingsSaveConfig" class="secondary" type="button" disabled>保存当前配置</button>
           <form id="defaultPortForm" class="default-port-form">
             <label><span>默认代理端口</span><input id="defaultPortInput" type="number" min="1" max="65535" step="1" required /></label>
             <button class="primary" type="submit">保存端口</button>
