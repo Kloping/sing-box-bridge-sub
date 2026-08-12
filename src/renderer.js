@@ -55,6 +55,49 @@ function escapeHtml(value) {
   }[character]));
 }
 
+function firstGrapheme(value) {
+  return new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(String(value)).containing(0)?.segment || '';
+}
+
+const FLAG_SVG = {
+  CN: '<rect width="24" height="16" fill="#de2910"/><path fill="#ffde00" d="m5 2 1 2.8L9 5.9 6 6l-1 2.8L4 6l-3-.1 3-1.2z"/>',
+  DE: '<path fill="#000" d="M0 0h24v5.33H0z"/><path fill="#d00" d="M0 5.33h24v5.34H0z"/><path fill="#ffce00" d="M0 10.67h24V16H0z"/>',
+  FR: '<path fill="#0055a4" d="M0 0h8v16H0z"/><path fill="#fff" d="M8 0h8v16H8z"/><path fill="#ef4135" d="M16 0h8v16h-8z"/>',
+  GB: '<rect width="24" height="16" fill="#012169"/><path stroke="#fff" stroke-width="4" d="m0 0 24 16M24 0 0 16"/><path stroke="#c8102e" stroke-width="2" d="m0 0 24 16M24 0 0 16"/><path stroke="#fff" stroke-width="6" d="M12 0v16M0 8h24"/><path stroke="#c8102e" stroke-width="3" d="M12 0v16M0 8h24"/>',
+  HK: '<rect width="24" height="16" rx="1" fill="#de2910"/><circle cx="12" cy="8" r="4" fill="#fff"/><circle cx="12" cy="8" r="2" fill="#de2910"/>',
+  IN: '<path fill="#ff9933" d="M0 0h24v5.33H0z"/><path fill="#fff" d="M0 5.33h24v5.34H0z"/><path fill="#128807" d="M0 10.67h24V16H0z"/><circle cx="12" cy="8" r="2" fill="none" stroke="#000080" stroke-width=".6"/>',
+  IT: '<path fill="#009246" d="M0 0h8v16H0z"/><path fill="#fff" d="M8 0h8v16H8z"/><path fill="#ce2b37" d="M16 0h8v16h-8z"/>',
+  JP: '<rect width="24" height="16" rx="1" fill="#fff"/><circle cx="12" cy="8" r="4" fill="#bc002d"/>',
+  KR: '<rect width="24" height="16" rx="1" fill="#fff"/><circle cx="12" cy="8" r="3.2" fill="#cd2e3a"/><path fill="#0047a0" d="M12 8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 1 1 0-6.4z"/>',
+  MY: '<path fill="#cc0001" d="M0 0h24v1.78H0zM0 3.56h24v1.78H0zM0 7.12h24V8.9H0zM0 10.68h24v1.78H0zM0 14.24h24V16H0z"/><path fill="#010066" d="M0 0h11v9H0z"/><circle cx="5" cy="4.5" r="2.6" fill="#fc0"/>',
+  NL: '<path fill="#ae1c28" d="M0 0h24v5.33H0z"/><path fill="#fff" d="M0 5.33h24v5.34H0z"/><path fill="#21468b" d="M0 10.67h24V16H0z"/>',
+  PH: '<path fill="#0038a8" d="M0 0h24v8H0z"/><path fill="#ce1126" d="M0 8h24v8H0z"/><path fill="#fff" d="m0 0 11 8L0 16z"/>',
+  RU: '<path fill="#fff" d="M0 0h24v5.33H0z"/><path fill="#0039a6" d="M0 5.33h24v5.34H0z"/><path fill="#d52b1e" d="M0 10.67h24V16H0z"/>',
+  SG: '<path fill="#ed2939" d="M0 0h24v8H0z"/><path fill="#fff" d="M0 8h24v8H0z"/><circle cx="6" cy="4" r="2.5" fill="#fff"/><circle cx="7" cy="4" r="2.1" fill="#ed2939"/>',
+  TH: '<path fill="#a51931" d="M0 0h24v2.67H0zM0 13.33h24V16H0z"/><path fill="#f4f5f8" d="M0 2.67h24v2.67H0zM0 10.67h24v2.67H0z"/><path fill="#2d2a4a" d="M0 5.33h24v5.34H0z"/>',
+  TW: '<rect width="24" height="16" rx="1" fill="#fe0000"/><path fill="#000095" d="M0 0h11v9H0z"/><circle cx="5.5" cy="4.5" r="2.4" fill="#fff"/>',
+  US: '<path fill="#b22234" d="M0 0h24v1.23H0zM0 2.46h24v1.23H0zM0 4.92h24v1.23H0zM0 7.38h24v1.23H0zM0 9.84h24v1.23H0zM0 12.3h24v1.23H0zM0 14.76h24V16H0z"/><path fill="#3c3b6e" d="M0 0h10.5v8.6H0z"/>',
+  VN: '<rect width="24" height="16" rx="1" fill="#da251d"/><path fill="#ff0" d="m12 3 1.18 3.63H17l-3.09 2.24 1.18 3.63L12 10.25l-3.09 2.25 1.18-3.63L7 6.63h3.82z"/>'
+};
+
+function flagCode(value) {
+  const grapheme = firstGrapheme(value);
+  const points = [...grapheme].map((character) => character.codePointAt(0));
+  if (points.length !== 2 || points.some((point) => point < 0x1f1e6 || point > 0x1f1ff)) return '';
+  return points.map((point) => String.fromCharCode(point - 0x1f1e6 + 65)).join('');
+}
+
+function flagIcon(code) {
+  const content = FLAG_SVG[code] || `<rect width="24" height="16" rx="1" fill="#edf4ff"/><text x="12" y="11" text-anchor="middle" fill="#3478f6" font-size="6" font-weight="700">${code}</text>`;
+  return `<svg class="node-flag" viewBox="0 0 24 16" role="img" aria-label="${code}">${content}</svg>`;
+}
+
+function renderName(value) {
+  const text = String(value);
+  const code = flagCode(text);
+  return code ? `${flagIcon(code)}${escapeHtml(text.slice(firstGrapheme(text).length))}` : escapeHtml(text);
+}
+
 function statusLabel(subscription) {
   const labels = { pending: '等待首次刷新', updating: '更新中...', ok: '已更新', error: '更新失败' };
   return labels[subscription.status] || subscription.status;
@@ -79,9 +122,9 @@ function subscriptionCard(subscription) {
   const errorLine = subscription.error ? `<p class="subscription-error">${escapeHtml(subscription.error)}</p>` : '';
   return `
     <article class="card subscription-item" data-id="${subscription.id}">
-      <div class="subscription-logo">${escapeHtml(subscription.name.slice(0, 1).toUpperCase())}</div>
+      <div class="subscription-logo">${flagCode(subscription.name) ? flagIcon(flagCode(subscription.name)) : escapeHtml(firstGrapheme(subscription.name).toUpperCase())}</div>
       <div class="subscription-main">
-        <h3><span class="subscription-name">${escapeHtml(subscription.name)}</span></h3>
+        <h3><span class="subscription-name">${renderName(subscription.name)}</span></h3>
         <p>${escapeHtml(subscription.url)}</p>
         <span class="subscription-meta"><i class="${statusClass(subscription)}"></i>${statusLabel(subscription)} · ${meta}</span>
         ${errorLine}
@@ -258,7 +301,7 @@ function renderNodeList() {
         <input class="node-check" type="checkbox" data-node-id="${node.id}" ${selectedNodeIds.has(node.id) ? 'checked' : ''} ${unsupported ? 'disabled' : ''} aria-label="勾选 ${escapeHtml(node.name)}" />
         <div class="node-badge">${escapeHtml(badge)}</div>
         <div class="node-main">
-          <h3>${escapeHtml(node.name)}${running ? ' <span class="selected-tag">代理运行中</span>' : ''}</h3>
+          <h3>${renderName(node.name)}${running ? ' <span class="selected-tag">代理运行中</span>' : ''}</h3>
           <p>${escapeHtml(node.type)} · ${escapeHtml(node.server)}:${escapeHtml(node.port)}${unsupported ? ` · <span class="unsupported">${escapeHtml(node.error)}</span>` : ''}</p>
           ${proxy ? `<span class="node-proxy-meta">代理：${escapeHtml(proxy.mode)} · ${escapeHtml(proxy.listen)}:${escapeHtml(proxy.port)}</span>` : ''}
         </div>
