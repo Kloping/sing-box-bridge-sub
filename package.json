@@ -27,8 +27,13 @@
     },
     "linux": {
       "target": "AppImage",
-      "category": "Network"
+      "category": "Network",
+      "icon": "src/logo.png"
     }
+  },
+  "dependencies": {
+    "extract-zip": "^2.0.1",
+    "undici": "^6.28.0"
   },
   "devDependencies": {
     "electron": "^37.2.6",

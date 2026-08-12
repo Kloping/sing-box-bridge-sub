@@ -102,12 +102,17 @@ sing-box config.json
 封装 sing-box 可执行文件的生命周期：
 
 1. 检查二进制文件是否存在及可执行。
-2. 写入当前配置。
-3. 执行 `sing-box check -c <config>`。
-4. 启动 `sing-box run -c <config>`。
-5. 读取 stdout/stderr，转换为 UI 可用的状态和日志。
-6. 端口冲突、配置错误或进程退出时报告明确原因。
-7. 停止时优先发送正常退出信号，超时后再结束进程。
+2. 根据 `process.platform` 和 `process.arch` 从 GitHub Releases API 选择对应资产。
+3. 下载到临时目录，解压并定位 `sing-box` 可执行文件。
+4. 安装到 Electron `app.getPath('userData')/sing-box/<platform>-<arch>`。
+5. 写入当前配置。
+6. 执行 `sing-box check -c <config>`。
+7. 启动 `sing-box run -c <config>`。
+8. 读取 stdout/stderr，转换为 UI 可用的状态和日志。
+9. 端口冲突、配置错误或进程退出时报告明确原因。
+10. 停止时优先发送正常退出信号，超时后再结束进程。
+
+下载器只允许选择固定仓库 `SagerNet/sing-box` 的 Release 资产，不接受 UI 传入任意下载地址，避免把核心安装接口变成任意文件下载器。下载弹窗可选的 HTTP/HTTPS 下载代理只作用于 GitHub API 和核心 ZIP 请求，不写入 sing-box 配置；本地 HTTP inbound 的监听地址和端口属于后续运行设置。
 
 不要让 UI 直接持有 `ChildProcess`，所有启动和停止操作集中在 CoreManager。
 

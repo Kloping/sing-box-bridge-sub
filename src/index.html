@@ -4,48 +4,116 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sing-box Bridge Sub</title>
+    <link rel="icon" type="image/png" href="./logo.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <main class="app-shell">
-      <header class="topbar">
-        <div>
-          <p class="eyebrow">SING-BOX BRIDGE SUB</p>
-          <h1>配置管理面板</h1>
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark"><img src="./logo.png" alt="Bridge Sub logo" /></div>
+          <div>
+            <strong>Bridge Sub</strong>
+            <span>sing-box manager</span>
+          </div>
         </div>
-        <span class="status"><i></i>服务未启动</span>
-      </header>
 
-      <section class="hero card">
-        <div>
-          <p class="eyebrow">READY TO CONFIGURE</p>
-          <h2>开始管理你的订阅与桥接配置</h2>
-          <p class="muted">这是一个可跨平台运行的桌面应用骨架，业务功能可以从这里继续接入。</p>
+        <nav class="nav" aria-label="主导航">
+          <a class="nav-item active" href="#subscriptions"><span>▤</span>订阅管理</a>
+          <a class="nav-item" href="#nodes"><span>⌁</span>节点列表</a>
+          <a class="nav-item" href="#settings"><span>⚙</span>运行设置</a>
+        </nav>
+
+        <div class="core-card">
+          <div class="core-heading"><span class="pulse"></span><span>sing-box 核心</span></div>
+          <strong id="coreStatus">检查中...</strong>
+          <span id="coreTarget">正在识别平台</span>
+          <button id="coreInstallButton" class="core-install" type="button">下载核心</button>
         </div>
-        <button id="actionButton" class="primary" type="button">创建第一条配置</button>
-      </section>
+      </aside>
 
-      <section class="stats">
-        <article class="card stat-card">
-          <span class="muted">订阅数量</span>
-          <strong>0</strong>
-        </article>
-        <article class="card stat-card">
-          <span class="muted">桥接节点</span>
-          <strong>0</strong>
-        </article>
-        <article class="card stat-card">
-          <span class="muted">运行状态</span>
-          <strong class="offline">离线</strong>
-        </article>
-      </section>
+      <section class="content" id="subscriptions">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">SUBSCRIPTIONS</p>
+            <h1>订阅管理</h1>
+            <p class="muted">导入 Clash 订阅，解析后交由 sing-box 转发。</p>
+          </div>
+          <div class="header-status"><i></i>核心未运行</div>
+        </header>
 
-      <section class="card empty-state">
-        <div class="empty-icon">＋</div>
-        <h3>还没有配置</h3>
-        <p class="muted">点击上方按钮开始创建，后续可在这里查看和管理配置。</p>
+        <section class="card import-card">
+          <div class="section-title">
+            <div class="section-icon">＋</div>
+            <div>
+              <h2>导入订阅链接</h2>
+              <p class="muted">支持 Clash YAML/JSON 订阅链接。</p>
+            </div>
+          </div>
+
+          <form id="subscriptionForm" class="subscription-form">
+            <label>
+              <span>订阅名称</span>
+              <input id="nameInput" name="name" type="text" placeholder="例如：我的机场" maxlength="40" required />
+            </label>
+            <label class="url-field">
+              <span>订阅链接</span>
+              <input id="urlInput" name="url" type="url" placeholder="https://example.com/subscribe/..." required />
+            </label>
+            <button class="primary" type="submit">添加订阅</button>
+          </form>
+          <p id="formMessage" class="form-message" role="status"></p>
+        </section>
+
+        <section class="section-heading">
+          <div>
+            <h2>我的订阅</h2>
+            <p class="muted">共 <strong id="subscriptionCount">0</strong> 条订阅</p>
+          </div>
+          <button id="refreshAllButton" class="secondary" type="button">↻ 刷新全部</button>
+        </section>
+
+        <section id="subscriptionList" class="subscription-list" aria-live="polite"></section>
       </section>
     </main>
+
+    <div id="coreModal" class="modal-backdrop" hidden>
+      <section class="modal card" role="dialog" aria-modal="true" aria-labelledby="coreModalTitle">
+        <button id="closeCoreModal" class="modal-close" type="button" aria-label="关闭">×</button>
+        <div class="modal-heading">
+          <div class="section-icon">⬇</div>
+          <div>
+            <p class="eyebrow">SING-BOX CORE</p>
+            <h2 id="coreModalTitle">下载核心</h2>
+          </div>
+        </div>
+
+        <form id="coreSettingsForm" class="core-settings-form">
+          <p class="modal-description">如果当前网络无法直连 GitHub，可以填写下载代理。该代理只用于下载 sing-box 核心，不会用于核心运行或本地 HTTP 监听。</p>
+          <div class="settings-fields">
+            <label>
+              <span>下载代理地址（可选）</span>
+              <input id="downloadProxyInput" name="downloadProxy" type="url" placeholder="http://127.0.0.1:7890" />
+            </label>
+          </div>
+          <p id="coreMessage" class="form-message" role="status"></p>
+          <div id="downloadProgressPanel" class="download-progress-panel" hidden>
+            <div class="progress-info"><span id="downloadStatus">准备下载...</span><strong id="downloadPercent">0%</strong></div>
+            <div class="progress-track"><div id="downloadProgressBar" class="progress-bar"></div></div>
+            <p id="downloadDetails" class="download-details">正在连接 GitHub...</p>
+            <div class="download-actions">
+              <button id="pauseDownloadButton" class="secondary" type="button">暂停</button>
+              <button id="cancelDownloadButton" class="danger" type="button">撤销下载</button>
+            </div>
+            <button id="openLogButton" class="log-link" type="button">打开下载日志</button>
+          </div>
+          <div id="coreFormActions" class="modal-actions">
+            <button id="cancelCoreModal" class="secondary" type="button">取消</button>
+            <button id="startCoreDownload" class="primary" type="submit">保存设置并下载</button>
+          </div>
+        </form>
+      </section>
+    </div>
     <script src="./renderer.js"></script>
   </body>
 </html>

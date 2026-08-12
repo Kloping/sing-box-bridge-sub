@@ -8,7 +8,7 @@
 - 解析并统一保存节点信息，不直接修改原始订阅。
 - 选择单个节点或节点组作为当前出口。
 - 由 sing-box 负责真实的代理连接、协议处理和流量转发。
-- 默认监听 `127.0.0.1:2080`，提供无认证 HTTP 代理。
+- 由 sing-box 默认监听 `127.0.0.1:2080`，提供无认证 HTTP 代理。
 - 支持 Windows 和 Linux，构建为 Windows 安装包或 Linux AppImage。
 
 ## 核心原则
@@ -42,16 +42,34 @@ npm run dist:linux
 
 构建产物输出到 `release/`。
 
-## 运行时依赖
-
-应用需要随安装包提供或由用户配置 sing-box 可执行文件。建议按平台放置在：
+下载核心失败时，可在下载弹窗中点击“打开下载日志”。日志位置为：
 
 ```text
-resources/sing-box/win32-x64/sing-box.exe
-resources/sing-box/linux-x64/sing-box
+<userData>/logs/download.log
 ```
 
-实际路径由运行时平台和架构决定，启动前通过 `sing-box check` 校验生成的配置。
+日志会记录 GitHub API/核心文件请求的状态码、限流信息、响应摘要和下载代理是否启用；下载代理中的密码会自动脱敏。
+
+## 运行时依赖
+
+应用首次使用时可以在左侧“sing-box 核心”卡片中点击“下载核心”。程序会通过 GitHub Releases API 获取最新版本，并按当前平台和架构下载对应压缩包。下载弹窗中的“下载代理”仅用于访问 GitHub API 和下载核心文件；留空时直连，不会影响 sing-box 运行时代理或本地 HTTP 监听配置。核心解压到 Electron 用户数据目录：
+
+```text
+<userData>/sing-box/<platform>-<arch>/sing-box[.exe]
+```
+
+当前支持的目标：
+
+```text
+Windows x64   windows-amd64
+Windows arm64 windows-arm64
+Linux x64     linux-amd64
+Linux arm64   linux-arm64
+macOS x64     darwin-amd64
+macOS arm64   darwin-arm64
+```
+
+安装目录使用 `app.getPath('userData')`，而不是安装包目录，因为 Windows/Linux 安装目录通常不可写，也不应在应用升级时被覆盖。下载完成后会定位 `sing-box` 可执行文件，并在 Linux/macOS 上补充执行权限。
 
 ## 当前状态
 
