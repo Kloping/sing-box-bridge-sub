@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const { buildConfig } = require('./singbox.cjs');
+const { buildConfig, DEFAULT_LISTEN } = require('./singbox.cjs');
 
 test('builds a mixed unauthenticated local proxy from the default template', async () => {
   const nodes = [
@@ -10,26 +10,23 @@ test('builds a mixed unauthenticated local proxy from the default template', asy
   ];
   const config = await buildConfig(nodes, path.join(__dirname, '..', 'test', 'config.json'));
   assert.deepEqual(config.inbounds, [
-    { type: 'mixed', tag: 'mixed-in-1', listen: '127.0.0.1', listen_port: 12080 },
-    { type: 'mixed', tag: 'mixed-in-2', listen: '127.0.0.1', listen_port: 2081 }
+    { type: 'mixed', tag: 'mixed-in-1', listen: DEFAULT_LISTEN, listen_port: 12080 },
+    { type: 'mixed', tag: 'mixed-in-2', listen: DEFAULT_LISTEN, listen_port: 2081 }
   ]);
   assert.equal(config.outbounds[0].type, 'shadowsocks');
   assert.equal(config.outbounds[0].password, 'secret');
   assert.equal(config.outbounds[1].server, 'example.org');
   assert.deepEqual(config.dns, {
     servers: [
-      { type: 'udp', tag: 'ali', server: '223.5.5.5' },
-      { type: 'udp', tag: 'tencent', server: '119.29.29.29' },
-      { type: 'udp', tag: 'baidu', server: '180.76.76.76' },
-      { type: 'udp', tag: 'cloudflare', server: '1.1.1.1' }
-    ],
-    final: 'ali'
+      { type: 'local', tag: 'local' }
+    ]
   });
-  assert.deepEqual(config.route.rules.slice(1), [
+  assert.deepEqual(config.route.rules[0], { protocol: 'dns', action: 'hijack-dns' });
+  assert.deepEqual(config.route.rules.slice(2), [
     { inbound: 'mixed-in-1', action: 'route', outbound: 'selected-node-1' },
     { inbound: 'mixed-in-2', action: 'route', outbound: 'selected-node-2' }
   ]);
-  assert.equal(config.route.default_domain_resolver, 'ali');
+  assert.equal(config.route.default_domain_resolver, undefined);
   assert.equal(config.route.final, 'direct');
 });
 
@@ -42,6 +39,7 @@ test('builds hysteria2 TLS from Clash fields and preserves server ports', async 
       password: 'secret',
       sni: 'iosapps.itunes.apple.com',
       'skip-cert-verify': true,
+      'client-fingerprint': 'dd9dd03d942400ad4c1400879bda98f4fa097183aa9a91a1423cdd42a3e183d7',
       server_ports: ['60000:65530']
     }
   }, path.join(__dirname, '..', 'test', 'config.json'));
@@ -53,5 +51,34 @@ test('builds hysteria2 TLS from Clash fields and preserves server ports', async 
     server_ports: ['60000:65530'],
     password: 'secret',
     tls: { enabled: true, server_name: 'iosapps.itunes.apple.com', insecure: true }
+  });
+});
+
+test('maps Clash VLESS uTLS fingerprint and WebSocket options', async () => {
+  const config = await buildConfig({
+    type: 'vless',
+    server: 'cfyes.7770006.xyz',
+    port: 443,
+    raw: {
+      uuid: 'e72d4049-f74d-4bc3-bee9-014878ec00d4',
+      tls: true,
+      'skip-cert-verify': false,
+      'client-fingerprint': 'safari',
+      servername: 'jp1-lx.7770006.xyz',
+      network: 'ws',
+      'ws-opts': { path: '/liangxin/data/jp', headers: { Host: 'jp1-lx.7770006.xyz' } }
+    }
+  }, path.join(__dirname, '..', 'test', 'config.json'));
+  const outbound = config.outbounds[0];
+  assert.deepEqual(outbound.tls, {
+    enabled: true,
+    server_name: 'jp1-lx.7770006.xyz',
+    insecure: false,
+    utls: { enabled: true, fingerprint: 'safari' }
+  });
+  assert.deepEqual(outbound.transport, {
+    type: 'ws',
+    path: '/liangxin/data/jp',
+    headers: { Host: 'jp1-lx.7770006.xyz' }
   });
 });

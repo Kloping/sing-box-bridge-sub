@@ -100,7 +100,14 @@ async function restartProxy(nodes) {
   await fsp.rename(tempConfig, configPath);
   const check = spawnSync(getExecutablePath(), ['check', '-c', configPath], { encoding: 'utf8' });
   if (check.error) throw new Error(`启动 sing-box 失败：${check.error.message}`);
-  if (check.status !== 0) throw new Error(`sing-box 配置校验失败：${(check.stderr || check.stdout || '').trim()}`);
+  if (check.status !== 0) {
+    const output = (check.stderr || check.stdout || '').trim();
+    const details = `sing-box 配置校验失败\n${output}\n\n${JSON.stringify(config, null, 2)}\n`;
+    await fsp.mkdir(path.dirname(getCoreLogPath()), { recursive: true });
+    await fsp.appendFile(getCoreLogPath(), details, 'utf8');
+    console.error(details);
+    throw new Error(`sing-box 配置校验失败：${output}`);
+  }
 
   await stopProxy();
   const child = spawn(getExecutablePath(), ['run', '-c', configPath], { windowsHide: true });
@@ -221,7 +228,7 @@ function createProxyAgent(proxyUrl) {
   try {
     url = new URL(value);
   } catch {
-    throw new Error('下载代理必须是有效的 HTTP/HTTPS URL，例如 http://127.0.0.1:7890');
+    throw new Error('代理地址必须是有效的 HTTP/HTTPS URL，例如 http://127.0.0.1:7890');
   }
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('下载代理仅支持 HTTP 或 HTTPS 代理');
   return new ProxyAgent(url.toString());
@@ -231,7 +238,7 @@ async function testProxyNode(nodeId) {
   if (typeof nodeId !== 'string' || !nodeId) throw new Error('无效的节点 ID');
   const node = proxyJob?.nodes.find((item) => item.id === nodeId);
   if (!node) throw new Error('该节点代理尚未开启');
-  const proxyUrl = `http://${node.listen}:${validateProxyPort(node.proxyPort)}`;
+  const proxyUrl = `http://${node.listen.includes(':') ? `[${node.listen}]` : node.listen}:${validateProxyPort(node.proxyPort)}`;
   const maxAttempts = 3;
   let lastError;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {

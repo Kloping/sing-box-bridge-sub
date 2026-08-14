@@ -1,20 +1,23 @@
 const fs = require('node:fs/promises');
 
-const DEFAULT_LISTEN = '127.0.0.1';
+const DEFAULT_LISTEN = '::';
 const DEFAULT_PORT = 12080;
+const UTLS_FINGERPRINTS = new Set(['chrome', 'firefox', 'edge', 'safari', '360', 'qq', 'ios', 'android', 'randomized']);
 
 function value(raw, ...keys) {
   return keys.map((key) => raw[key]).find((item) => item !== undefined && item !== null && item !== '');
 }
 
 function tlsConfig(raw) {
-  if (raw.tls && typeof raw.tls === 'object') return raw.tls;
   if (!raw.tls && !raw.sni && !raw.servername && !raw['skip-cert-verify']) return undefined;
-  return {
+  const tls = raw.tls && typeof raw.tls === 'object' ? { ...raw.tls } : {
     enabled: true,
     server_name: value(raw, 'sni', 'servername'),
     insecure: Boolean(raw['skip-cert-verify'])
   };
+  const fingerprint = String(value(raw, 'client-fingerprint', 'fingerprint') || '').toLowerCase();
+  if (UTLS_FINGERPRINTS.has(fingerprint) && !tls.utls) tls.utls = { enabled: true, fingerprint };
+  return tls;
 }
 
 function transportConfig(raw) {
@@ -36,7 +39,7 @@ function buildOutbound(node, tag = 'selected-node') {
   switch (node.type) {
     case 'ss': return { type: 'shadowsocks', ...base, method: value(raw, 'cipher', 'method'), password: raw.password };
     case 'vmess': return { type: 'vmess', ...base, uuid: raw.uuid, security: value(raw, 'cipher', 'security') || 'auto', alter_id: Number(raw.alterId ?? raw.alter_id ?? 0), tls: tlsConfig(raw), transport: transportConfig(raw) };
-    case 'vless': return { type: 'vless', ...base, uuid: raw.uuid, flow: raw.flow, tls: tlsConfig(raw), transport: transportConfig(raw) };
+    case 'vless': return { type: 'vless', ...base, uuid: raw.uuid, /*flow: raw.flow,*/ tls: tlsConfig(raw), transport: transportConfig(raw) };
     case 'trojan': return { type: 'trojan', ...base, password: raw.password, tls: tlsConfig(raw), transport: transportConfig(raw) };
     case 'socks5': return { type: 'socks', ...base, username: raw.username, password: raw.password };
     case 'http': return { type: 'http', ...base, username: raw.username, password: raw.password };
@@ -68,6 +71,7 @@ async function buildConfig(input, templatePath, { listen = DEFAULT_LISTEN, port 
     route: {
       ...(template.route || {}),
       rules: [
+        { protocol: 'dns', action: 'hijack-dns' },
         { action: 'sniff' },
         ...nodes.map((node, index) => ({
           inbound: inbounds[index].tag,
@@ -75,7 +79,6 @@ async function buildConfig(input, templatePath, { listen = DEFAULT_LISTEN, port 
           outbound: outbounds[index].tag
         }))
       ],
-      default_domain_resolver: 'ali',
       final: 'direct'
     }
   });
