@@ -4,6 +4,12 @@
       {
         "type": "local",
         "tag": "local"
+      },
+      {
+        "type": "udp",
+        "tag": "cloudflare",
+        "server": "1.1.1.1",
+        "server_port": 53
       }
     ]
   }
