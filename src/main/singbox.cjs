@@ -8,20 +8,26 @@ function value(raw, ...keys) {
   return keys.map((key) => raw[key]).find((item) => item !== undefined && item !== null && item !== '');
 }
 
-function tlsConfig(raw) {
+function tlsConfig(raw, fallbackServer, serverNameKeys = ['servername', 'sni']) {
+  if (raw.tls === false) return undefined;
   if (!raw.tls && !raw.sni && !raw.servername && !raw['skip-cert-verify']) return undefined;
   const tls = raw.tls && typeof raw.tls === 'object' ? { ...raw.tls } : {
     enabled: true,
-    server_name: value(raw, 'sni', 'servername'),
+    server_name: value(raw, ...serverNameKeys) || fallbackServer,
     insecure: Boolean(raw['skip-cert-verify'])
   };
-  // Clash 将 ALPN 放在节点根级，sing-box 则要求它位于 tls 中。
+  if (tls.server_name === undefined) tls.server_name = value(raw, ...serverNameKeys) || fallbackServer;
   const alpn = value(raw, 'alpn');
   if (alpn !== undefined && tls.alpn === undefined) {
     tls.alpn = Array.isArray(alpn) ? alpn : String(alpn).split(',').map((item) => item.trim()).filter(Boolean);
   }
   const fingerprint = String(value(raw, 'client-fingerprint', 'fingerprint') || '').toLowerCase();
   if (UTLS_FINGERPRINTS.has(fingerprint) && !tls.utls) tls.utls = { enabled: true, fingerprint };
+  const reality = raw['reality-opts'] || raw.reality_opts || raw.reality;
+  const publicKey = reality && value(reality, 'public-key', 'public_key');
+  if (publicKey && !tls.reality) {
+    tls.reality = { enabled: true, public_key: publicKey, short_id: value(reality, 'short-id', 'short_id') || '' };
+  }
   return tls;
 }
 
@@ -33,18 +39,20 @@ function hysteria2DomainResolver(raw) {
   };
 }
 
-function hysteria2TlsConfig(raw) {
-  const tls = tlsConfig(raw);
-  // Hysteria2 基于 QUIC；未从订阅提供时使用其常用的 HTTP/3 ALPN。
-  if (tls && tls.alpn === undefined) tls.alpn = ['h3'];
+function hysteria2TlsConfig(raw, fallbackServer) {
+  const tls = tlsConfig(raw, fallbackServer, ['sni', 'servername']);
+  if (!tls) return { enabled: true, server_name: fallbackServer, insecure: Boolean(raw['skip-cert-verify']), alpn: ['h3'] };
+  if (tls.alpn === undefined) tls.alpn = ['h3'];
   return tls;
 }
 
-function transportConfig(raw) {
+function transportConfig(raw, fallbackServer) {
   const network = String(raw.network || '').toLowerCase();
   if (network === 'ws') {
     const options = raw['ws-opts'] || {};
-    return { type: 'ws', path: options.path || raw.path || '/', headers: options.headers };
+    const headers = { ...(options.headers || {}) };
+    if (!headers.Host) headers.Host = raw['ws-host'] || raw.Host || raw.servername || raw.sni || fallbackServer;
+    return { type: 'ws', path: options.path || raw.path || '/', headers };
   }
   if (network === 'grpc') {
     const options = raw['grpc-opts'] || {};
@@ -58,13 +66,17 @@ function buildOutbound(node, tag = 'selected-node') {
   const base = { tag, server: node.server, server_port: node.port };
   switch (node.type) {
     case 'ss': return { type: 'shadowsocks', ...base, method: value(raw, 'cipher', 'method'), password: raw.password };
-    case 'vmess': return { type: 'vmess', ...base, uuid: raw.uuid, security: value(raw, 'cipher', 'security') || 'auto', alter_id: Number(raw.alterId ?? raw.alter_id ?? 0), tls: tlsConfig(raw), transport: transportConfig(raw) };
-    case 'vless': return { type: 'vless', ...base, uuid: raw.uuid, /*flow: raw.flow,*/ tls: tlsConfig(raw), transport: transportConfig(raw) };
-    case 'trojan': return { type: 'trojan', ...base, password: raw.password, tls: tlsConfig(raw), transport: transportConfig(raw) };
+    case 'vmess': return { type: 'vmess', ...base, uuid: raw.uuid, security: value(raw, 'cipher', 'security') || 'auto', alter_id: Number(raw.alterId ?? raw.alter_id ?? 0), tls: tlsConfig(raw, node.server), transport: transportConfig(raw, node.server) };
+    case 'vless': return { type: 'vless', ...base, uuid: raw.uuid, flow: raw.flow, tls: tlsConfig(raw, node.server), transport: transportConfig(raw, node.server) };
+    case 'trojan': return { type: 'trojan', ...base, password: raw.password, tls: tlsConfig(raw, node.server), transport: transportConfig(raw, node.server) };
     case 'socks5': return { type: 'socks', ...base, username: raw.username, password: raw.password };
     case 'http': return { type: 'http', ...base, username: raw.username, password: raw.password };
-    case 'hysteria2': return { type: 'hysteria2', ...base, server_ports: raw.server_ports, domain_resolver: hysteria2DomainResolver(raw), password: raw.password, up_mbps: raw.up || raw.up_mbps, down_mbps: raw.down || raw.down_mbps, obfs: raw.obfs ? { type: raw.obfs, password: raw['obfs-password'] || raw.obfs_password } : undefined, tls: hysteria2TlsConfig(raw) };
-    default: throw new Error(`不支持的节点协议：${node.type}`);
+    case 'hysteria2': {
+      const ports = value(raw, 'server_ports', 'ports');
+      const serverPorts = ports === undefined ? undefined : Array.isArray(ports) ? ports : [String(ports).replace(/-/g, ':')];
+      return { type: 'hysteria2', ...base, server_ports: serverPorts, domain_resolver: hysteria2DomainResolver(raw), password: raw.password, up_mbps: raw.up || raw.up_mbps, down_mbps: raw.down || raw.down_mbps, obfs: raw.obfs ? { type: raw.obfs, password: raw['obfs-password'] || raw.obfs_password } : undefined, tls: hysteria2TlsConfig(raw, node.server) };
+    }
+    default: throw new Error(`\u4e0d\u652f\u6301\u7684\u8282\u70b9\u534f\u8bae\uff1a${node.type}`);
   }
 }
 

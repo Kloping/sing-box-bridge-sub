@@ -108,3 +108,27 @@ test('maps Clash VLESS uTLS fingerprint and WebSocket options', async () => {
     headers: { Host: 'jp1-lx.7770006.xyz' }
   });
 });
+
+test('maps VLESS flow, Reality and WS Host fallback', async () => {
+  const config = await buildConfig({
+    type: 'vless', server: 'edge.example.com', port: 443,
+    raw: {
+      uuid: 'uuid', flow: 'xtls-rprx-vision', tls: true,
+      servername: 'www.example.com', 'reality-opts': { 'public-key': 'pk', 'short-id': 'sid' },
+      network: 'ws', path: '/ws'
+    }
+  }, path.join(__dirname, '..', 'test', 'config.json'));
+  assert.equal(config.outbounds[0].flow, 'xtls-rprx-vision');
+  assert.deepEqual(config.outbounds[0].tls.reality, { enabled: true, public_key: 'pk', short_id: 'sid' });
+  assert.deepEqual(config.outbounds[0].transport, {
+    type: 'ws', path: '/ws', headers: { Host: 'www.example.com' }
+  });
+});
+
+test('maps Clash Hysteria2 ports range', async () => {
+  const config = await buildConfig({
+    type: 'hysteria2', server: 'hy.example.com', port: 443,
+    raw: { password: 'secret', sni: 'www.example.com', ports: '20000-30000', 'skip-cert-verify': true }
+  }, path.join(__dirname, '..', 'test', 'config.json'));
+  assert.deepEqual(config.outbounds[0].server_ports, ['20000:30000']);
+});
