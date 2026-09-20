@@ -1,6 +1,6 @@
 const fs = require('node:fs/promises');
 
-const DEFAULT_LISTEN = '::';
+const DEFAULT_LISTEN = '127.0.0.1';
 const DEFAULT_PORT = 12080;
 const UTLS_FINGERPRINTS = new Set(['chrome', 'firefox', 'edge', 'safari', '360', 'qq', 'ios', 'android', 'randomized']);
 
@@ -61,11 +61,28 @@ function transportConfig(raw, fallbackServer) {
   return undefined;
 }
 
+function shadowsocksPlugin(raw) {
+  const plugin = String(raw.plugin || '').trim().toLowerCase();
+  if (!plugin) return {};
+  const options = raw['plugin-opts'] || raw.plugin_opts;
+  if (plugin === 'obfs-local' && typeof options === 'string') {
+    return { plugin, plugin_opts: options };
+  }
+  if (plugin !== 'obfs' && plugin !== 'obfs-local') return {};
+  const values = options && typeof options === 'object' ? options : {};
+  const mode = value(values, 'mode', 'obfs') || 'http';
+  const host = value(values, 'host', 'obfs-host');
+  return {
+    plugin: 'obfs-local',
+    plugin_opts: [`obfs=${mode}`, host ? `obfs-host=${host}` : ''].filter(Boolean).join(';')
+  };
+}
+
 function buildOutbound(node, tag = 'selected-node') {
   const raw = node.raw || {};
   const base = { tag, server: node.server, server_port: node.port };
   switch (node.type) {
-    case 'ss': return { type: 'shadowsocks', ...base, method: value(raw, 'cipher', 'method'), password: raw.password };
+    case 'ss': return { type: 'shadowsocks', ...base, method: value(raw, 'cipher', 'method'), password: raw.password, ...shadowsocksPlugin(raw) };
     case 'vmess': return { type: 'vmess', ...base, uuid: raw.uuid, security: value(raw, 'cipher', 'security') || 'auto', alter_id: Number(raw.alterId ?? raw.alter_id ?? 0), tls: tlsConfig(raw, node.server), transport: transportConfig(raw, node.server) };
     case 'vless': return { type: 'vless', ...base, uuid: raw.uuid, flow: raw.flow, tls: tlsConfig(raw, node.server), transport: transportConfig(raw, node.server) };
     case 'trojan': return { type: 'trojan', ...base, password: raw.password, tls: tlsConfig(raw, node.server), transport: transportConfig(raw, node.server) };
@@ -102,7 +119,7 @@ async function buildConfig(input, templatePath, { listen = DEFAULT_LISTEN, port 
     outbounds: [...outbounds, { type: 'direct', tag: 'direct' }],
     route: {
       ...(template.route || {}),
-      default_domain_resolver: template.route?.default_domain_resolver || 'cloudflare',
+      default_domain_resolver: template.route?.default_domain_resolver || 'local',
       rules: [
         { protocol: 'dns', action: 'hijack-dns' },
         { action: 'sniff' },

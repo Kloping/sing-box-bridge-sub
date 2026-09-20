@@ -27,8 +27,28 @@ test('builds a mixed unauthenticated local proxy from the default template', asy
     { inbound: 'mixed-in-1', action: 'route', outbound: 'selected-node-1' },
     { inbound: 'mixed-in-2', action: 'route', outbound: 'selected-node-2' }
   ]);
-  assert.equal(config.route.default_domain_resolver, 'cloudflare');
+  assert.equal(config.route.default_domain_resolver, 'local');
   assert.equal(config.route.final, 'direct');
+});
+
+test('maps Clash Shadowsocks obfs plugin to sing-box fields', async () => {
+  const config = await buildConfig({
+    type: 'ss', server: 'ss.example.com', port: 443,
+    raw: {
+      cipher: 'aes-128-gcm', password: 'secret', plugin: 'obfs',
+      'plugin-opts': { mode: 'http', host: 'cdn.example.com' }
+    }
+  }, path.join(__dirname, '..', 'test', 'config.json'));
+  assert.deepEqual(config.outbounds[0], {
+    type: 'shadowsocks',
+    tag: 'selected-node-1',
+    server: 'ss.example.com',
+    server_port: 443,
+    method: 'aes-128-gcm',
+    password: 'secret',
+    plugin: 'obfs-local',
+    plugin_opts: 'obfs=http;obfs-host=cdn.example.com'
+  });
 });
 
 test('builds hysteria2 TLS from Clash fields and preserves server ports', async () => {
