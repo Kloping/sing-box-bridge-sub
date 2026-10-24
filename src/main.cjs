@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const { spawn, spawnSync } = require('node:child_process');
 const { dialog } = require('electron');
 const fs = require('node:fs');
@@ -47,7 +47,27 @@ function getRuntimeConfigPath() {
 }
 
 function getCoreLogPath() {
-  return path.join(app.getPath('userData'), 'logs', 'core.log');
+  const now = new Date();
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return path.join(app.getPath('userData'), 'logs', `core-${date}.log`);
+}
+
+async function pruneCoreLogs() {
+  const logsDir = path.dirname(getCoreLogPath());
+  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  let files;
+  try { files = await fsp.readdir(logsDir); } catch { return; }
+  await Promise.all(files.filter((name) => /^core(?:-\d{4}-\d{2}-\d{2})?\.log$/.test(name)).map(async (name) => {
+    const file = path.join(logsDir, name);
+    const stat = await fsp.stat(file).catch(() => null);
+    if (stat && stat.mtimeMs < cutoff) await fsp.rm(file, { force: true });
+  }));
+}
+
+async function appendCoreLog(text) {
+  await fsp.mkdir(path.dirname(getCoreLogPath()), { recursive: true });
+  await pruneCoreLogs();
+  await fsp.appendFile(getCoreLogPath(), text, 'utf8');
 }
 
 function sendNodeStatus() {
@@ -103,8 +123,7 @@ async function restartProxy(nodes) {
   if (check.status !== 0) {
     const output = (check.stderr || check.stdout || '').trim();
     const details = `sing-box 配置校验失败\n${output}\n\n${JSON.stringify(config, null, 2)}\n`;
-    await fsp.mkdir(path.dirname(getCoreLogPath()), { recursive: true });
-    await fsp.appendFile(getCoreLogPath(), details, 'utf8');
+    await appendCoreLog(details);
     console.error(details);
     throw new Error(`sing-box 配置校验失败：${output}`);
   }
@@ -113,6 +132,8 @@ async function restartProxy(nodes) {
   const child = spawn(getExecutablePath(), ['run', '-c', configPath], { windowsHide: true });
   await new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
   await fsp.mkdir(path.dirname(getCoreLogPath()), { recursive: true });
+  await pruneCoreLogs();
+  // shortcut: 跨天运行的 sing-box 进程继续写启动当日的文件，下次重启才轮转到新日期
   const logStream = fs.createWriteStream(getCoreLogPath(), { flags: 'a' });
   child.stdout?.pipe(logStream, { end: false });
   child.stderr?.pipe(logStream, { end: false });
@@ -550,6 +571,7 @@ ipcMain.handle('node:stop', async (_event, id) => {
 ipcMain.handle('node:test-ip', async (_event, nodeId) => testProxyNode(nodeId));
 
 app.whenReady().then(() => {
+  pruneCoreLogs();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
